@@ -8,6 +8,6 @@ pub struct Role {
     pub name: String,
     pub colour: i32,
 
-    pub content: i32,
+    pub content: i64,
     pub hiearchy: i32
 }

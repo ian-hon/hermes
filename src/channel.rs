@@ -24,7 +24,7 @@ impl Channel {
         // check if user exists
     }
 
-    pub async fn delete(db: Pool<Sqlite>, name: String, description: String, creator: String) {
+    pub async fn delete(db: Pool<Sqlite>, name: String, description: String, username: String, password: String) {
         
     }
 }
