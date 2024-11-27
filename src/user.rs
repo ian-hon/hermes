@@ -1,9 +1,12 @@
-use std::collections::HashMap;
-
-use axum::{extract::{Query, State}, http::StatusCode};
+use axum::{extract::State, response::IntoResponse, Json};
+use axum_extra::extract::WithRejection;
+use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite, Row};
 use strum_macros::Display;
 
+use crate::hermes_error::HermesError;
+
+#[derive(Serialize, Deserialize)]
 pub struct User {
     username: String,
     password: String
@@ -61,10 +64,10 @@ pub enum AccountResult {
     UsernameExist
 }
 
-pub async fn login(State(db): State<Pool<Sqlite>>, Query(params): Query<HashMap<String, String>>) -> Result<String, StatusCode> {
-    Ok(User::login(&db, params.get(&"username".to_string()).unwrap().clone(), params.get(&"password".to_string()).unwrap().clone()).await.to_string())
+pub async fn login(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, HermesError>) -> impl IntoResponse {
+    User::login(&db, user_info.username, user_info.password).await.to_string()
 }
 
-pub async fn signup(State(db): State<Pool<Sqlite>>, Query(params): Query<HashMap<String, String>>) -> String {
-    User::signup(&db,  params.get(&"username".to_string()).unwrap().clone(), params.get(&"password".to_string()).unwrap().clone()).await.to_string()
+pub async fn signup(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, HermesError>) -> impl IntoResponse {
+    User::signup(&db, user_info.username, user_info.password).await.to_string()
 }

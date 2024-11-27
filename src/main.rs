@@ -1,5 +1,7 @@
-use axum::{routing::get, Router};
+use axum::{http::StatusCode, response::{IntoResponse, Response}, routing::{get, post}, Router};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
+
+mod hermes_error;
 
 mod user;
 mod channel;
@@ -7,12 +9,27 @@ mod membership;
 mod role;
 mod permission;
 
+pub async fn not_implemented_yet() -> Response {
+    (StatusCode::NOT_IMPLEMENTED, "not implemented yet chill".to_string()).into_response()
+}
+
 #[tokio::main]
-async fn main() {
+async fn main() {    
     let app = Router::new()
         .route("/", get(|| async { "hermes at your service" }))
-        .route("/user/login", get(user::login))
-        .route("/user/signup", get(user::signup))
+        .route("/user/login", post(user::login))
+        .route("/user/signup", post(user::signup))
+
+        .route("/channel/create", post(not_implemented_yet))
+        .route("/channel/delete", post(not_implemented_yet))
+        .route("/channel/edit", post(not_implemented_yet))
+        .route("/channel/fetch", post(not_implemented_yet))
+
+        .route("/roles/create", post(not_implemented_yet))
+        .route("/roles/delete", post(not_implemented_yet))
+        .route("/roles/edit", post(not_implemented_yet))
+        .route("/roles/fetch", post(not_implemented_yet))
+
         .with_state(SqlitePool::connect_with(SqliteConnectOptions::new().filename("db.sqlite3")).await.unwrap())
         ;
 
