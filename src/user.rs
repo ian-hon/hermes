@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite, Row};
 use strum_macros::Display;
 
-use crate::hermes_error::HermesError;
+use crate::{extractor_error::ExtractorError, session};
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
@@ -18,7 +18,7 @@ impl User {
         }
 
         if sqlx::query("select count(*) from user where username = $1 and password = $2;")
-            .bind(username)
+            .bind(username.clone())
             .bind(password)
             .fetch_one(db)
             .await
@@ -26,7 +26,7 @@ impl User {
             return AccountResult::PasswordWrong
         }
 
-        AccountResult::Success
+        AccountResult::Success(session::get_session_id(db, username).await)
     }
 
     pub async fn username_existance(db: &Pool<Sqlite>, username: &String) -> bool {
@@ -43,18 +43,18 @@ impl User {
         }
 
         sqlx::query("insert into user(username, password) values($1, $2);")
-            .bind(username)
+            .bind(username.clone())
             .bind(password)
             .execute(db)
             .await.unwrap();
 
-        AccountResult::Success
+        AccountResult::Success(session::get_session_id(db, username).await)
     }
 }
 
 #[derive(Display)]
 pub enum AccountResult {
-    Success,
+    Success(String),
 
     // login
     PasswordWrong,
@@ -64,10 +64,10 @@ pub enum AccountResult {
     UsernameExist
 }
 
-pub async fn login(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, HermesError>) -> impl IntoResponse {
+pub async fn login(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, ExtractorError>) -> impl IntoResponse {
     User::login(&db, user_info.username, user_info.password).await.to_string()
 }
 
-pub async fn signup(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, HermesError>) -> impl IntoResponse {
+pub async fn signup(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, ExtractorError>) -> impl IntoResponse {
     User::signup(&db, user_info.username, user_info.password).await.to_string()
 }

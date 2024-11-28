@@ -1,7 +1,10 @@
 use axum::{http::StatusCode, response::{IntoResponse, Response}, routing::{get, post}, Router};
+use rand::{thread_rng, Rng};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 
-mod hermes_error;
+mod utils;
+mod session;
+mod extractor_error;
 
 mod user;
 mod channel;
@@ -14,7 +17,7 @@ pub async fn not_implemented_yet() -> Response {
 }
 
 #[tokio::main]
-async fn main() {    
+async fn main() {
     let app = Router::new()
         .route("/", get(|| async { "hermes at your service" }))
         .route("/user/login", post(user::login))
@@ -29,6 +32,8 @@ async fn main() {
         .route("/roles/delete", post(not_implemented_yet))
         .route("/roles/edit", post(not_implemented_yet))
         .route("/roles/fetch", post(not_implemented_yet))
+
+        .route("/test", get(session::test))
 
         .with_state(SqlitePool::connect_with(SqliteConnectOptions::new().filename("db.sqlite3")).await.unwrap())
         ;
