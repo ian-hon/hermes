@@ -26,7 +26,7 @@ impl User {
             return AccountResult::PasswordWrong
         }
 
-        AccountResult::Success(session::get_session_id(db, username).await)
+        AccountResult::Success(session::Session::get_session_id(db, username).await)
     }
 
     pub async fn username_existance(db: &Pool<Sqlite>, username: &String) -> bool {
@@ -48,11 +48,11 @@ impl User {
             .execute(db)
             .await.unwrap();
 
-        AccountResult::Success(session::get_session_id(db, username).await)
+        AccountResult::Success(session::Session::get_session_id(db, username).await)
     }
 }
 
-#[derive(Display)]
+#[derive(Display, Serialize, Deserialize)]
 pub enum AccountResult {
     Success(String),
 
@@ -65,9 +65,10 @@ pub enum AccountResult {
 }
 
 pub async fn login(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, ExtractorError>) -> impl IntoResponse {
-    User::login(&db, user_info.username, user_info.password).await.to_string()
+    serde_json::to_string(&User::login(&db, user_info.username, user_info.password).await).unwrap()
 }
 
 pub async fn signup(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, ExtractorError>) -> impl IntoResponse {
-    User::signup(&db, user_info.username, user_info.password).await.to_string()
+    // input sanitization for this
+    serde_json::to_string(&User::signup(&db, user_info.username, user_info.password).await).unwrap()
 }

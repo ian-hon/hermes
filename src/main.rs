@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+
 use axum::{http::StatusCode, response::{IntoResponse, Response}, routing::{get, post}, Router};
+use hermes_error::HermesFormat;
 use rand::{thread_rng, Rng};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 
+mod hermes_error;
 mod utils;
 mod session;
 mod extractor_error;
@@ -23,7 +27,7 @@ async fn main() {
         .route("/user/login", post(user::login))
         .route("/user/signup", post(user::signup))
 
-        .route("/channel/create", post(not_implemented_yet))
+        .route("/channel/create", post(channel::create))
         .route("/channel/delete", post(not_implemented_yet))
         .route("/channel/edit", post(not_implemented_yet))
         .route("/channel/fetch", post(not_implemented_yet))
@@ -32,8 +36,6 @@ async fn main() {
         .route("/roles/delete", post(not_implemented_yet))
         .route("/roles/edit", post(not_implemented_yet))
         .route("/roles/fetch", post(not_implemented_yet))
-
-        .route("/test", get(session::test))
 
         .with_state(SqlitePool::connect_with(SqliteConnectOptions::new().filename("db.sqlite3")).await.unwrap())
         ;
