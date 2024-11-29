@@ -22,7 +22,8 @@ pub enum HermesFormat {
     Key,      // all lowercase, no spaces or special characters
 }
 
-pub fn check(c: &HashMap<String, String>, t: Vec<(String, HermesFormat)>) -> HermesError {
+pub fn check(c: &HashMap<String, String>, t: Vec<(&str, HermesFormat)>) -> HermesError {
+    let t = t.into_iter().map(|x| (x.0.to_string(), x.1)).collect::<Vec<(String, HermesFormat)>>();
     for i in t {
         match c.get(&i.0) {
             Some(v) => {

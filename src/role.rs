@@ -11,3 +11,18 @@ pub struct Role {
     pub content: i64,
     pub hiearchy: i32
 }
+
+/*
+create
+delete
+fetch
+edit
+    - change name
+    - change colour
+    - change perms
+    - change hierarchy
+*/
+
+impl Role {
+    
+}
