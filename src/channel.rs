@@ -5,7 +5,7 @@ use axum_extra::extract::WithRejection;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, Pool, Sqlite};
 
-use crate::{extractor_error::ExtractorError, hermes_error::{self, HermesError}, permission::{user_permission_check, PermissionError, Permissions}, session::RawSessionID, utils};
+use crate::{extractor_error::ExtractorError, hermes_error, permission::{user_permission_check, PermissionError, Permissions}, session::RawSessionID, utils};
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct Channel {
@@ -22,7 +22,7 @@ pub struct Channel {
 // leave
 // add
 impl Channel {
-    async fn fetch_by_id(db: &Pool<Sqlite>, channel: i32) -> Option<Channel> {
+    pub async fn fetch_by_id(db: &Pool<Sqlite>, channel: i32) -> Option<Channel> {
         sqlx::query_as::<_, Channel>("select * from channel where id = $1")
             .bind(channel)
             .fetch_optional(db)
@@ -74,27 +74,18 @@ pub async fn create(
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    match session_id.into_session(&db).await {
-        Ok(s) => {
-            match hermes_error::check(&query, vec![
-                ("name", hermes_error::HermesFormat::Key),
-                ("description", hermes_error::HermesFormat::Unspecified),
-            ]) {
-                HermesError::Success => {
-                    Channel::create(
-                        &db,
-                        utils::from_query("name", &query),
-                        utils::from_query("description", &query),
-                        s.user
-                    ).await;
+    utils::request_boiler(db, query, session_id, vec![
+        ("channel_id", hermes_error::HermesFormat::Number),
+    ], |db, s, query| async move {
+        Channel::create(
+            &db,
+            utils::from_query("name", &query),
+            utils::from_query("description", &query),
+            s.user
+        ).await;
 
-                    "Success".into_response()
-                },
-                r => serde_json::to_string(&r).unwrap().into_response()
-            }
-        },
-        Err(e) => serde_json::to_string(&e).unwrap().into_response()
-    }
+        "Success".to_string()
+    }).await
 }
 
 pub async fn delete(
@@ -102,26 +93,18 @@ pub async fn delete(
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    match session_id.into_session(&db).await {
-        Ok(s) => {
-            match hermes_error::check(&query, vec![
-                ("channel_id", hermes_error::HermesFormat::Number)
-            ]) {
-                HermesError::Success => {
-                    let channel_id = utils::from_query("channel_id", &query).parse::<i32>().unwrap();
-                    match user_permission_check(&db, s.user, channel_id, Permissions::ChannelDelete).await {
-                        PermissionError::Success => {
-                            Channel::delete(&db, channel_id).await;
-                            "Success".into_response()
-                        },
-                        p => serde_json::to_string(&p).unwrap().into_response()
-                    }
-                },
-                r => serde_json::to_string(&r).unwrap().into_response()
-            }
-        },
-        Err(e) => serde_json::to_string(&e).unwrap().into_response()
-    }
+    utils::request_boiler(db, query, session_id, vec![
+        ("channel_id", hermes_error::HermesFormat::Number),
+    ], |db, s, query| async move {
+        let channel_id = utils::from_query("channel_id", &query).parse::<i32>().unwrap();
+        match user_permission_check(&db, &s.user, channel_id, Permissions::ChannelDelete).await {
+            PermissionError::Success => {
+                Channel::delete(&db, channel_id).await;
+                "Success".to_string()
+            },
+            p => serde_json::to_string(&p).unwrap()
+        }
+    }).await
 }
 
 pub async fn edit(
@@ -129,43 +112,33 @@ pub async fn edit(
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    match session_id.into_session(&db).await {
-        Ok(s) => {
-            match hermes_error::check(&query, vec![
-                ("channel_id", hermes_error::HermesFormat::Number),
-                ("name", hermes_error::HermesFormat::Unspecified),
-                ("description", hermes_error::HermesFormat::Unspecified)
-            ]) {
-                HermesError::Success => {
-                    let channel_id = query.get(&"channel_id".to_string()).unwrap().parse::<i32>().unwrap();
-                    match user_permission_check(&db, s.user, channel_id, Permissions::ChannelEdit).await {
-                        PermissionError::Success => {
-                            Channel::edit(
-                                &db,
-                                channel_id,
-                                utils::from_query("name", &query),
-                                utils::from_query("description", &query)
-                            ).await;
-                            "Success".into_response()
-                        },
-                        p => serde_json::to_string(&p).unwrap().into_response()
-                    }
-                },
-                r => serde_json::to_string(&r).unwrap().into_response()
-            }
-        },
-        Err(e) => serde_json::to_string(&e).unwrap().into_response()
-    }
+    utils::request_boiler(db, query, session_id, vec![
+        ("channel_id", hermes_error::HermesFormat::Number),
+        ("name", hermes_error::HermesFormat::Unspecified),
+        ("description", hermes_error::HermesFormat::Unspecified)
+    ],
+    |db, s, query| async move {
+        let channel_id = query.get(&"channel_id".to_string()).unwrap().parse::<i32>().unwrap();
+        match user_permission_check(&db, &s.user, channel_id, Permissions::ChannelEdit).await {
+            PermissionError::Success => {
+                Channel::edit(
+                    &db,
+                    channel_id,
+                    utils::from_query("name", &query),
+                    utils::from_query("description", &query)
+                ).await;
+                "Success".to_string()
+            },
+            p => serde_json::to_string(&p).unwrap()
+        }
+    }).await
 }
 
 pub async fn fetch_all(
     State(db): State<Pool<Sqlite>>,
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    match session_id.into_session(&db).await {
-        Ok(s) => {
-            serde_json::to_string(&Channel::fetch_all(&db, s.user).await).unwrap().into_response()
-        },
-        Err(e) => serde_json::to_string(&e).unwrap().into_response()
-    }
+    utils::request_boiler(db, HashMap::new(), session_id, vec![],|db, s, _| async move {
+        serde_json::to_string(&Channel::fetch_all(&db, s.user).await).unwrap()
+    }).await
 }

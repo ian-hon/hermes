@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite, Row};
 use strum_macros::Display;
 
-use crate::{extractor_error::ExtractorError, session};
+use crate::{extractor_error::ExtractorError, role::Role, session};
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
