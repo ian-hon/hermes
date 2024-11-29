@@ -1,5 +1,6 @@
 use axum::extract::State;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, Pool, Sqlite, Row};
 
 use crate::utils;
@@ -13,29 +14,103 @@ pub struct Session {
     pub user: String,
     pub last_used: i64
 }
+impl Session {
+    // fetch ONLY
+    pub async fn fetch_by_username(db: &Pool<Sqlite>, user: String, only_alive: bool) -> Option<Session> {
+        // only alive -> non-expired ids
+        let r = sqlx::query_as::<_, Session>("select * from session where user = $1 and last_used > $2;")
+            .bind(user)
+            .bind(if only_alive { utils::get_time() - SESSION_EXPIRY } else { 0 }) // sometimes i wish this was python
+            .fetch_optional(db)
+            .await.unwrap();
 
-pub async fn get_session_id(db: &Pool<Sqlite>, user: String) -> String {
-    let sessions = sqlx::query_as::<_, Session>("select * from session where user = $1 and last_used > $2;")
-        .bind(user.clone())
-        .bind(utils::get_time() - SESSION_EXPIRY)
-        .fetch_optional(db)
-        .await.unwrap();
+        if r.is_some() {
+            r.as_ref().unwrap().refresh_last_used(db).await;
+        }
 
-    println!("{}", utils::get_time());
+        r
+    }
 
-    match sessions {
-        Some(s) => format!("{:x}", s.id),
-        None => {
-            let id = generate_id(db).await;
-            sqlx::query("insert into session values($1, $2, $3);")
-                .bind(id.clone())
-                .bind(user)
-                .bind(utils::get_time())
-                .execute(db)
-                .await.unwrap();
-            format!("{:x}", id)
+    // fetch ONLY
+    pub async fn fetch_by_id(db: &Pool<Sqlite>, id: i64, only_alive: bool) -> Option<Session> {
+        let r = sqlx::query_as::<_, Session>("select * from session where id = $1 and last_used > $2;")
+            .bind(id)
+            .bind(if only_alive { utils::get_time() - SESSION_EXPIRY } else { 0 })
+            .fetch_optional(db)
+            .await.unwrap();
+
+        if r.is_some() {
+            r.as_ref().unwrap().refresh_last_used(db).await;
+        }
+
+        r
+    }
+
+    async fn refresh_last_used(&self, db: &Pool<Sqlite>) {
+        sqlx::query("update session set last_used = $1 where id = $2;")
+            .bind(utils::get_time())
+            .bind(self.id)
+            .execute(db)
+            .await.unwrap();
+    }
+
+    // generated when needed
+    pub async fn get_session_id(db: &Pool<Sqlite>, user: String) -> String {
+        // used ONLY when login or signup
+        match Session::fetch_by_username(db, user.clone(), true).await {
+            Some(s) => format!("{:x}", s.id),
+            None => {
+                let id = generate_id(db).await;
+                Session::insert_new(id, user, db).await;
+                format!("{:x}", id)
+            }
         }
     }
+
+    // insert into db
+    pub async fn insert_new(id: i64, user: String, db: &Pool<Sqlite>) {
+        sqlx::query("insert into session values($1, $2, $3);")
+            .bind(id)
+            .bind(user)
+            .bind(utils::get_time())
+            .execute(db)
+            .await.unwrap();
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RawSessionID { // used ONLY for the json payload
+    pub id: String,
+}
+impl RawSessionID {
+    pub fn to_int(self) -> Result<i64, SessionError> {
+        match i64::from_str_radix(&self.id.replace("-", ""), 16) {
+            Ok(i) => Ok(i),
+            Err(_) => Err(SessionError::Invalid)
+        }
+    }
+
+    pub async fn into_session(self, db: &Pool<Sqlite>) -> Result<Session, SessionError> {
+        match self.to_int() {
+            Ok(i) => {
+                match Session::fetch_by_id(db, i, true).await {
+                    Some(s) => Ok(s), // exist, not expired
+                    None => match Session::fetch_by_id(db, i, false).await {
+                        Some(_) => Err(SessionError::Expired), // exists, but expired
+                        None => Err(SessionError::NoExist) // doesnt exist
+                    }
+                }
+            }
+            Err(e) => Err(e)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum SessionError {
+    NoExist,
+    Expired,
+    Invalid
 }
 
 async fn generate_id(db: &Pool<Sqlite>) -> i64 {
@@ -63,13 +138,4 @@ async fn generate_id(db: &Pool<Sqlite>) -> i64 {
 
         return candidate;
     }
-}
-
-pub async fn test(State(db): State<Pool<Sqlite>>) {
-    sqlx::query("insert into session values($1, $2, $3);")
-        .bind(16i128.pow(15) as i64)
-        .bind("lorem")
-        .bind(0)
-        .execute(&db)
-        .await.unwrap();
 }
