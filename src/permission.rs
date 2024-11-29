@@ -1,19 +1,20 @@
 use std::collections::HashSet;
 
+use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite, Row};
 
 use crate::role::Role;
 
-pub async fn user_permission_check(db: Pool<Sqlite>, user: String, channel: i32, p: Permissions) -> bool {
+pub async fn user_permission_check(db: &Pool<Sqlite>, user: String, channel: i32, p: Permissions) -> PermissionError {
     // check if user is server creator
     match sqlx::query("select count(*) from channel where id = $1 and creator = $2;")
         .bind(channel.clone())
         .bind(user.clone())
-        .fetch_optional(&db)
+        .fetch_optional(db)
         .await.unwrap() {
         Some(i) => {
             if i.get::<i32, usize>(0) >= 1 {
-                return true;
+                return PermissionError::Success;
             }
         },
         _ => {}
@@ -23,11 +24,11 @@ pub async fn user_permission_check(db: Pool<Sqlite>, user: String, channel: i32,
     match sqlx::query_as::<_, Role>("select * from roles where id in (select role_id from membership where user = $1 and channel_id = $2);")
         .bind(user)
         .bind(channel)
-        .fetch_optional(&db)
+        .fetch_optional(db)
         .await
         .unwrap() {
         Some(r) => permission_check(r.id, p),
-        _ => false
+        _ => PermissionError::NoPermission
     }
 }
 
@@ -39,8 +40,8 @@ pub fn generate_permission(p: Vec<Permissions>) -> i64 {
     result
 }
 
-pub fn permission_check(content: i32, p: Permissions) -> bool {
-    ((content >> (p as i32)) & 1) == 1
+pub fn permission_check(content: i32, p: Permissions) -> PermissionError {
+    if ((content >> (p as i32)) & 1) == 1 { PermissionError::Success } else { PermissionError::NoPermission }
 }
 
 pub enum Permissions {
@@ -58,4 +59,10 @@ pub enum Permissions {
 
     ChannelEdit = 8, // server name + description
     ChannelDelete = 9,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum PermissionError {
+    Success,
+    NoPermission
 }
