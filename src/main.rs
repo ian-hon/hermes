@@ -32,10 +32,10 @@ async fn main() {
         .route("/channel/edit", post(channel::edit))
         .route("/channel/fetch/all", post(channel::fetch_all))
 
-        .route("/roles/create", post(not_implemented_yet))
-        .route("/roles/delete", post(not_implemented_yet))
+        .route("/roles/create", post(role::create))
+        .route("/roles/delete", post(role::delete))
         .route("/roles/edit", post(not_implemented_yet))
-        .route("/roles/fetch", post(not_implemented_yet))
+        .route("/roles/fetch", post(role::fetch_all))
 
         .with_state(SqlitePool::connect_with(SqliteConnectOptions::new().filename("db.sqlite3")).await.unwrap())
         ;

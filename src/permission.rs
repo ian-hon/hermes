@@ -5,7 +5,7 @@ use sqlx::{Pool, Sqlite, Row};
 
 use crate::role::Role;
 
-pub async fn user_permission_check(db: &Pool<Sqlite>, user: String, channel: i32, p: Permissions) -> PermissionError {
+pub async fn user_permission_check(db: &Pool<Sqlite>, user: &String, channel: i32, p: Permissions) -> PermissionError {
     // check if user is server creator
     match sqlx::query("select count(*) from channel where id = $1 and creator = $2;")
         .bind(channel.clone())
@@ -61,7 +61,7 @@ pub enum Permissions {
     ChannelDelete = 9,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub enum PermissionError {
     Success,
     NoPermission
