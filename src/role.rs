@@ -5,7 +5,7 @@ use axum_extra::extract::WithRejection;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, Pool, Sqlite};
 
-use crate::{channel, extractor_error::ExtractorError, hermes_error::HermesFormat, membership::Membership, permission::{self, PermissionError}, session::RawSessionID, utils};
+use crate::{channel, extractor_error::ExtractorError, hermes_error::HermesFormat, membership::Membership, permission::{self, PermissionError}, session::RawSessionID, utils, AppState};
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct Role {
@@ -87,11 +87,11 @@ impl Role {
 }
 
 pub async fn create(
-    State(db): State<Pool<Sqlite>>,
+    State(app_state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    utils::request_boiler(db, query, session, vec![
+    utils::request_boiler(app_state, query, session, vec![
         ("channel_id", HermesFormat::Number),
         ("name", HermesFormat::Unspecified),
         ("colour", HermesFormat::Number),
@@ -115,11 +115,11 @@ pub async fn create(
 }
 
 pub async fn delete(
-    State(db): State<Pool<Sqlite>>,
+    State(app_state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    utils::request_boiler(db, query, session, vec![
+    utils::request_boiler(app_state, query, session, vec![
         ("role_id", HermesFormat::Number),
     ], |db, s, query| async move {
         let target_role = match Role::fetch(&db, utils::from_query("role_id", &query).parse::<i32>().unwrap()).await {
@@ -144,11 +144,11 @@ pub async fn delete(
 }
 
 pub async fn fetch_all(
-    State(db): State<Pool<Sqlite>>,
+    State(app_state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    utils::request_boiler(db, query, session, vec![
+    utils::request_boiler(app_state, query, session, vec![
         ("channel_id", HermesFormat::Number),
     ], |db, s, query| async move {
         let channel_id = utils::from_query("channel_id", &query).parse::<i32>().unwrap();

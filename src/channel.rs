@@ -5,7 +5,7 @@ use axum_extra::extract::WithRejection;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, Pool, Sqlite};
 
-use crate::{extractor_error::ExtractorError, hermes_error, permission::{user_permission_check, PermissionError, Permissions}, session::RawSessionID, utils};
+use crate::{extractor_error::ExtractorError, hermes_error, permission::{user_permission_check, PermissionError, Permissions}, session::RawSessionID, utils, AppState};
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct Channel {
@@ -70,11 +70,11 @@ impl Channel {
 }
 
 pub async fn create(
-    State(db): State<Pool<Sqlite>>,
+    State(app_state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    utils::request_boiler(db, query, session_id, vec![
+    utils::request_boiler(app_state, query, session_id, vec![
         ("channel_id", hermes_error::HermesFormat::Number),
     ], |db, s, query| async move {
         Channel::create(
@@ -89,11 +89,11 @@ pub async fn create(
 }
 
 pub async fn delete(
-    State(db): State<Pool<Sqlite>>,
+    State(app_state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    utils::request_boiler(db, query, session_id, vec![
+    utils::request_boiler(app_state, query, session_id, vec![
         ("channel_id", hermes_error::HermesFormat::Number),
     ], |db, s, query| async move {
         let channel_id = utils::from_query("channel_id", &query).parse::<i32>().unwrap();
@@ -108,11 +108,11 @@ pub async fn delete(
 }
 
 pub async fn edit(
-    State(db): State<Pool<Sqlite>>,
+    State(app_state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    utils::request_boiler(db, query, session_id, vec![
+    utils::request_boiler(app_state, query, session_id, vec![
         ("channel_id", hermes_error::HermesFormat::Number),
         ("name", hermes_error::HermesFormat::Unspecified),
         ("description", hermes_error::HermesFormat::Unspecified)
@@ -135,10 +135,10 @@ pub async fn edit(
 }
 
 pub async fn fetch_all(
-    State(db): State<Pool<Sqlite>>,
+    State(app_state): State<AppState>,
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
-    utils::request_boiler(db, HashMap::new(), session_id, vec![],|db, s, _| async move {
+    utils::request_boiler(app_state, HashMap::new(), session_id, vec![],|db, s, _| async move {
         serde_json::to_string(&Channel::fetch_all(&db, s.user).await).unwrap()
     }).await
 }
