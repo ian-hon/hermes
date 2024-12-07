@@ -1,6 +1,7 @@
-use std::{collections::HashMap, future::Future, net::SocketAddr, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
 
 use axum::{extract::{State, WebSocketUpgrade}, response::IntoResponse};
+use futures::lock::Mutex;
 use sqlx::{query_builder, Pool, Sqlite};
 use tokio::sync::broadcast;
 
@@ -64,6 +65,28 @@ where F: Fn(Pool<Sqlite>, Session, HashMap<String, String>) -> Fut, Fut: Future<
         Ok(s) => {
             match hermes_error::check(&query, hermes_check) {
                 HermesError::Success => func(app_state.db, s, query).await.into_response(),
+                r => serde_json::to_string(&r).unwrap().into_response()
+            }
+        },
+        Err(e) => serde_json::to_string(&e).unwrap().into_response()
+    }
+}
+
+// returns AppState instead of just .db
+pub async fn request_boiler_whole<F, Fut>(
+    app_state: AppState,
+    query: HashMap<String, String>,
+    session_id: RawSessionID,
+
+    hermes_check: Vec<(&str, HermesFormat)>,
+    
+    func: F) -> impl IntoResponse
+where F: Fn(AppState, Session, HashMap<String, String>) -> Fut, Fut: Future<Output = String>,
+{
+    match session_id.into_session(&app_state.db).await {
+        Ok(s) => {
+            match hermes_error::check(&query, hermes_check) {
+                HermesError::Success => func(app_state, s, query).await.into_response(),
                 r => serde_json::to_string(&r).unwrap().into_response()
             }
         },

@@ -45,20 +45,21 @@ pub fn permission_check(content: i32, p: Permissions) -> PermissionError {
 }
 
 pub enum Permissions {
-    MessageSend = 0,
-    MessageDelete = 1,
+    MessageView = 0,
+    MessageSend = 1,
+    MessageDelete = 2,
 
-    UserAdd = 2,
-    UserBan = 3,
-    UserKick = 4,
+    UserAdd = 10,
+    UserBan = 11,
+    UserKick = 12,
 
-    RoleEdit = 5, // name, colour, role permissions
+    RoleEdit = 20, // name, colour, role permissions
     // only change perms of roles below own
-    RoleDelete = 6,
-    RoleCreate = 7,
+    RoleDelete = 21,
+    RoleCreate = 22,
 
-    ChannelEdit = 8, // server name + description
-    ChannelDelete = 9,
+    ChannelEdit = 30, // server name + description
+    ChannelDelete = 31,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]

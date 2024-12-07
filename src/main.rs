@@ -48,12 +48,12 @@ async fn main() {
         .route("/roles/edit", post(not_implemented_yet))
         .route("/roles/fetch", post(role::fetch_all))
 
-        .route("/message/send", any(message::message_socket_handler))
-        .route("/message/delete", post(not_implemented_yet))
-        .route("/message/edit", post(not_implemented_yet))
-        .route("/message/fetch", post(not_implemented_yet))
+        .route("/message/send", any(ws_statemachine::message_socket_handler))
+        .route("/message/delete", post(message::delete))
+        .route("/message/edit", post(message::edit))
+        .route("/message/fetch", post(message::fetch))
 
-        .route("/message/debug_state", get(message::debug_state))
+        .route("/message/debug_state", get(ws_statemachine::debug_state))
 
         .with_state(
             AppState {
