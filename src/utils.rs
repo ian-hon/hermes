@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::Future, net::SocketAddr, time::{SystemTime, UNIX_EPOCH}};
 
 use axum::{extract::{State, WebSocketUpgrade}, response::IntoResponse};
-use sqlx::{Pool, Sqlite};
+use sqlx::{query_builder, Pool, Sqlite};
 use tokio::sync::broadcast;
 
 use crate::{hermes_error::{self, HermesError, HermesFormat}, session::{RawSessionID, Session}, ws_statemachine::SocketContainer, AppState};
@@ -21,7 +21,6 @@ pub fn from_query(k: &str, q: &HashMap<String, String>) -> String {
 pub async fn ws_request_boiler<F, Fut>(
     app_state: AppState,
     query: HashMap<String, String>,
-    session_id: RawSessionID,
 
     hermes_check: Vec<(&str, HermesFormat)>,
 
@@ -30,12 +29,20 @@ pub async fn ws_request_boiler<F, Fut>(
     ws: WebSocketUpgrade,
     
     func: F) -> impl IntoResponse
-where F: Fn(Pool<Sqlite>, HashMap<i32, SocketContainer>, Session, HashMap<String, String>, SocketAddr, WebSocketUpgrade) -> Fut, Fut: Future<Output = String>,
-    {
+where F: Fn(AppState, Session, HashMap<String, String>, SocketAddr, WebSocketUpgrade) -> Fut, Fut: Future<Output: IntoResponse>,
+{
+    match hermes_error::check(&query, vec![("session_id", HermesFormat::Unspecified)]) {
+        HermesError::Success => {},
+        r => {
+            return serde_json::to_string(&r).unwrap().into_response();
+        }
+    }
+    let session_id = RawSessionID { id: query.get("session_id").unwrap().to_string() };
+
     match session_id.into_session(&app_state.db).await {
         Ok(s) => {
             match hermes_error::check(&query, hermes_check) {
-                HermesError::Success => func(app_state.db, app_state.ws_set, s, query, addr, ws).await.into_response(),
+                HermesError::Success => func(app_state, s, query, addr, ws).await.into_response(),
                 r => serde_json::to_string(&r).unwrap().into_response()
             }
         },
@@ -52,7 +59,7 @@ pub async fn request_boiler<F, Fut>(
     
     func: F) -> impl IntoResponse
 where F: Fn(Pool<Sqlite>, Session, HashMap<String, String>) -> Fut, Fut: Future<Output = String>,
-    {
+{
     match session_id.into_session(&app_state.db).await {
         Ok(s) => {
             match hermes_error::check(&query, hermes_check) {

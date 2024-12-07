@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::{HashMap, HashSet}, net::SocketAddr, sync::Arc};
 
 use axum::{extract::{ws::{self, WebSocket}, ConnectInfo, Query, State, WebSocketUpgrade}, response::IntoResponse, Json};
 use axum_extra::extract::WithRejection;
@@ -6,10 +6,10 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, Pool, Sqlite};
 
-use futures::{sink::SinkExt, stream::StreamExt};
+use futures::{lock::Mutex, sink::SinkExt, stream::StreamExt};
 use tokio::sync::broadcast;
 
-use crate::{extractor_error::ExtractorError, hermes_error::HermesFormat, session::{RawSessionID, Session}, utils, ws_statemachine::SocketContainer, AppState};
+use crate::{channel::Channel, extractor_error::ExtractorError, hermes_error::{self, HermesError, HermesFormat}, session::{RawSessionID, Session}, utils, ws_statemachine::SocketContainer, AppState};
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct Message {
@@ -55,34 +55,58 @@ impl Message {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub enum MessageWebsocketError {
+    Success,
+
+    UserAlreadyConnected,
+}
+
+#[axum::debug_handler]
 pub async fn message_socket_handler(
     State(app_state): State<AppState>,
     Query(query): Query<HashMap<String, String>>,
-    WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>,
     ws: WebSocketUpgrade,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
-    utils::ws_request_boiler(app_state, query, session_id, vec![
-        ("channel_id", HermesFormat::Number)
-    ], addr, ws,
-    |db, ws_set, s, query, addr, ws| async move {
+    // NOTE:
+    // RawSessionID cannot be passed through request body
+    // passed through query params as a string instead
+    utils::ws_request_boiler(app_state, query, vec![("channel_id", HermesFormat::Number)], addr, ws,
+    |app_state, s, query, addr, ws| async move {
         let channel_id = utils::from_query("channel_id", &query).parse::<i32>().unwrap();
-        match ws_set.get(&channel_id) {
+
+        let db = app_state.db.clone();
+
+        // i wonder if theres gonna be an error here in the future
+        let binding = app_state.ws_set.lock().await.clone();
+        let result = binding.get(&channel_id);
+
+        match result {
             Some(socket_container) => {
-                println!("attempt : {addr}");
+                let socket_container = socket_container.clone();
+
+                if socket_container.lock().await.contains(s.user.clone()) {
+                    return serde_json::to_string(&MessageWebsocketError::UserAlreadyConnected).unwrap().into_response();
+                }
+
                 ws.on_upgrade(move |socket|
-                    message_socket(
-                        s,
-                        db,
-                        socket_container,
-                        socket,
-                        addr
-                    )
-                );
-                "ws upgraded".to_string()
+                    message_socket(s, db, socket_container, socket, addr)
+                )
             },
             None => {
-                return "no channel".to_string()
+                match Channel::fetch_by_id(&db, channel_id).await {
+                    Some(c) => {
+                        let socket_container = Arc::new(Mutex::new(SocketContainer { channel_id: c.id, tx: broadcast::channel(1024).0, users: HashSet::new() }));
+                        app_state.ws_set.lock().await.insert(c.id, socket_container.clone());
+                        // maybe an error here sometime too
+
+                        ws.on_upgrade(move |socket|
+                            message_socket(s, db, socket_container, socket, addr)
+                        )
+                    },
+                    None => "no channel".to_string().into_response()
+                }
             }
         }
     }).await
@@ -91,80 +115,77 @@ pub async fn message_socket_handler(
 async fn message_socket(
     s: Session,
     db: Pool<Sqlite>,
-    socket_container: &SocketContainer, // needs to be &mut?
+    socket_container: Arc<Mutex<SocketContainer>>,
     mut socket: WebSocket,
     address: SocketAddr
 ) {
     // this socket is linked to one statemachine only
-    if socket.send(ws::Message::Ping(vec![42, 42, 42])).await.is_ok() {
-        println!("s({address}) : ping");
-    } else {
-        println!("s({address}) Error : ping");
+    if socket.send(ws::Message::Ping(vec![112, 111, 110, 103])).await.is_err() {
         return;
     }
 
-    let (mut sender, mut receiver) = socket.split();
+    socket_container.lock().await.clone().add(s.user.clone());
+    let mut rx = socket_container.lock().await.tx.subscribe();
 
+    // let sc = socket_container.lock().await.clone();
+    let s_ = s.clone();
+    let sc_ = socket_container.clone();
+    let (mut sender, mut receiver) = socket.split();
     let mut send_task = tokio::spawn(async move {
-        sender.send(ws::Message::Text("".to_string()));
+        // server sends this
+
+        let sc = sc_.clone();
+        let user = s_;
+
+        while let Ok(msg) = rx.recv().await {
+            sqlx::query("insert into message(channel_id, content, author, timestamp) values($1, $2, $3, $4);")
+                .bind(sc.lock().await.channel_id)
+                .bind(msg.clone())
+                .bind(user.id)
+                .bind(utils::get_time())
+                .execute(&db)
+                .await.unwrap();
+            let _ = sender.send(ws::Message::Text(msg)).await;
+        }
     });
 
+    let s_ = s.clone();
+    let sc_ = socket_container.clone();
     let mut recv_task = tokio::spawn(async move {
+        // server receives this
         let mut cnt = 0;
+
+        let user = s_;
+        let sc = sc_;
+
         while let Some(Ok(msg)) = receiver.next().await {
             cnt += 1;
-            let t = msg.into_text().unwrap();
-            println!("{address}({cnt}) : {t}");
-            if t == "quit".to_string() {
+            let msg = msg.into_text().unwrap();
+            let _ = sc.clone().lock().await.clone().broadcast(format!("{} : {msg}", user.user));
+            if msg == "quit".to_string() {
                 return cnt;
             }
         }
         cnt
     });
 
-    // https://github.com/tokio-rs/axum/blob/main/examples/chat/src/main.rs
+    tokio::select! {
+        _ = &mut send_task => recv_task.abort(),
+        _ = &mut recv_task => send_task.abort(),
+    };
 
-    // // We subscribe *before* sending the "joined" message, so that we will also
-    // // display it to our client.
-    // let mut rx = server_sender.subscribe();
+    let _ = socket_container.lock().await.clone().broadcast(format!("{} has disconnected", s.user));
+}
 
-    // // Now send the "joined" message to all subscribers.
-    // let msg = format!("{username} joined.");
-    // tracing::debug!("{msg}");
-    // let _ = server_sender.send(msg);
+pub async fn debug_state(
+    State(app_state): State<AppState>
+) -> String {
+    let guard = app_state.ws_set.lock().await;
+    let a = guard.clone();
+    for i in a {
+        let g = i.1.lock().await.clone();
+        println!("{} : {:?}", i.0, g);
+    }
 
-    // // Spawn the first task that will receive broadcast messages and send text
-    // // messages over the websocket to our client.
-    // let mut send_task = tokio::spawn(async move {
-    //     while let Ok(msg) = rx.recv().await {
-    //         // In any websocket error, break loop.
-    //         if sender.send(Message::Text(msg)).await.is_err() {
-    //             break;
-    //         }
-    //     }
-    // });
-
-    // // Clone things we want to pass (move) to the receiving task.
-    // let tx = server_sender.clone();
-    // let name = username.clone();
-
-    // // Spawn a task that takes messages from the websocket, prepends the user
-    // // name, and sends them to all broadcast subscribers.
-    // let mut recv_task = tokio::spawn(async move {
-    //     while let Some(Ok(Message::Text(text))) = receiver.next().await {
-    //         // Add username before message.
-    //         let _ = tx.send(format!("{name}: {text}"));
-    //     }
-    // });
-
-    // // If any one of the tasks run to completion, we abort the other.
-    // tokio::select! {
-    //     _ = &mut send_task => recv_task.abort(),
-    //     _ = &mut recv_task => send_task.abort(),
-    // };
-
-    // // Send "user left" message (similar to "joined" above).
-    // let msg = format!("{username} left.");
-    // tracing::debug!("{msg}");
-    // let _ = server_sender.send(msg);
+    "".to_string()
 }

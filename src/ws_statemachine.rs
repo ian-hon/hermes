@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use tokio::sync::broadcast::{self, error::SendError};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SocketContainer {
     pub channel_id: i32,
     pub tx: broadcast::Sender<String>,

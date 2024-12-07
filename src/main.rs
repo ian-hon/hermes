@@ -1,6 +1,7 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{extract::FromRef, http::StatusCode, response::{IntoResponse, Response}, routing::{any, get, post}, Router};
+use futures::lock::Mutex;
 use tokio::sync::broadcast;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -27,7 +28,7 @@ pub async fn not_implemented_yet() -> Response {
 #[derive(Clone, FromRef)]
 pub struct AppState {
     pub db: Pool<Sqlite>,
-    pub ws_set: HashMap<i32, ws_statemachine::SocketContainer>
+    pub ws_set: Arc<Mutex<HashMap<i32, Arc<Mutex<ws_statemachine::SocketContainer>>>>>
 }
 
 #[tokio::main]
@@ -52,10 +53,12 @@ async fn main() {
         .route("/message/edit", post(not_implemented_yet))
         .route("/message/fetch", post(not_implemented_yet))
 
+        .route("/message/debug_state", get(message::debug_state))
+
         .with_state(
             AppState {
                 db: SqlitePool::connect_with(SqliteConnectOptions::new().filename("db.sqlite3")).await.unwrap(),
-                ws_set: HashMap::new()
+                ws_set: Arc::new(Mutex::new(HashMap::new()))
             }
         );
 

@@ -9,7 +9,7 @@ use crate::{extractor_error::ExtractorError, hermes_error, permission::{user_per
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct Channel {
-    id: i32,
+    pub id: i32,
     name: String,
     description: String
 }
@@ -75,7 +75,8 @@ pub async fn create(
     WithRejection(Json(session_id), _): WithRejection<Json<RawSessionID>, ExtractorError>
 ) -> impl IntoResponse {
     utils::request_boiler(app_state, query, session_id, vec![
-        ("channel_id", hermes_error::HermesFormat::Number),
+        ("name", hermes_error::HermesFormat::Unspecified),
+        ("description", hermes_error::HermesFormat::Unspecified)
     ], |db, s, query| async move {
         Channel::create(
             &db,

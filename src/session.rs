@@ -8,7 +8,7 @@ use crate::utils;
 const SESSION_LENGTH: u32 = 5 * 3 * 4; // fffff-fffff-fffff
 const SESSION_EXPIRY: i64 = 3600 * 24; // 24 hours after no activity
 
-#[derive(FromRow)]
+#[derive(FromRow, Clone)]
 pub struct Session {
     pub id: i64,
     pub user: String,
