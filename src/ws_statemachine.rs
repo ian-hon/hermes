@@ -8,7 +8,7 @@ use futures::{lock::Mutex, sink::SinkExt, stream::StreamExt};
 
 use crate::{channel::Channel, hermes_error::HermesFormat, session::Session, utils, AppState};
 
-use tokio::sync::broadcast::{self, error::SendError};
+use tokio::sync::broadcast;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageSpecies {
@@ -53,7 +53,7 @@ impl SocketContainer {
     }
 
     pub fn broadcast(&mut self, m: MessageSpecies) {
-        self.tx.send(serde_json::to_string(&m).unwrap().to_string());
+        let _ = self.tx.send(serde_json::to_string(&m).unwrap().to_string());
     }
 }
 
@@ -163,9 +163,10 @@ async fn message_socket(
 
             match candidate {
                 Ok(e) => {
+
                     sqlx::query("insert into message(channel_id, content, author, timestamp) values($1, $2, $3, $4);")
                         .bind(sc.lock().await.channel_id)
-                        .bind(msg.clone())
+                        .bind(serde_json::to_string(&e).unwrap())
                         .bind(user.user.clone())
                         .bind(utils::get_time())
                         .execute(&db)
