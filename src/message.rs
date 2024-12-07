@@ -11,24 +11,43 @@ use tokio::sync::broadcast;
 
 use crate::{channel::Channel, extractor_error::ExtractorError, hermes_error::{self, HermesError, HermesFormat}, session::{RawSessionID, Session}, utils, ws_statemachine::SocketContainer, AppState};
 
-#[derive(FromRow, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Message {
+    // what users receive
+    pub author: String,
+    pub content: String,
+    pub timestamp: i64,
+    pub reply: Option<i32>,
+    pub image: Option<String> // source link?
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SentMessage {
+    // what users send
+    pub content: String,
+    pub reply: Option<i32>,
+    pub image: Option<String>
+}
+
+#[derive(FromRow, Serialize, Deserialize)]
+pub struct RawMessage {
+    // in the database
     pub id: i32,
     pub channel_id: i32,
     pub content: String,
     pub author: String,
     pub timestamp: i32
 }
-impl Message {
-    pub async fn fetch(db: &Pool<Sqlite>, id: i32) -> Option<Message> {
-        sqlx::query_as::<_, Message>("select * from message where id = $1;")
+impl RawMessage {
+    pub async fn fetch(db: &Pool<Sqlite>, id: i32) -> Option<RawMessage> {
+        sqlx::query_as::<_, RawMessage>("select * from message where id = $1;")
             .bind(id)
             .fetch_optional(db)
             .await.unwrap()
     }
 
-    pub async fn fetch_from_channel(db: &Pool<Sqlite>, channel_id: i32, amount: i32) -> Vec<Message> {
-        sqlx::query_as::<_, Message>("select * from message where channel_id = $1 order by timestamp desc limit $2;")
+    pub async fn fetch_from_channel(db: &Pool<Sqlite>, channel_id: i32, amount: i32) -> Vec<RawMessage> {
+        sqlx::query_as::<_, RawMessage>("select * from message where channel_id = $1 order by timestamp desc limit $2;")
             .bind(channel_id)
             .bind(amount)
             .fetch_all(db)
@@ -45,7 +64,7 @@ impl Message {
     }
 
     pub async fn delete(db: &Pool<Sqlite>, id: i32) {
-        if Message::fetch(db, id).await.is_none() {
+        if RawMessage::fetch(db, id).await.is_none() {
             return;
         }
         sqlx::query("delete from messages where id = $1;")
@@ -120,31 +139,30 @@ async fn message_socket(
     address: SocketAddr
 ) {
     // this socket is linked to one statemachine only
-    if socket.send(ws::Message::Ping(vec![112, 111, 110, 103])).await.is_err() {
+    // if socket.send(ws::Message::Ping(vec![112, 111, 110, 103])).await.is_err() {
+    //     return;
+    // }
+
+    if socket.send(ws::Message::Text("***".to_string())).await.is_err() {
         return;
     }
 
     socket_container.lock().await.clone().add(s.user.clone());
     let mut rx = socket_container.lock().await.tx.subscribe();
 
-    // let sc = socket_container.lock().await.clone();
+    let _ = socket_container.lock().await.clone().broadcast(format!("{} has connected", s.user));
+
+    let (mut sender, mut receiver) = socket.split();
+
     let s_ = s.clone();
     let sc_ = socket_container.clone();
-    let (mut sender, mut receiver) = socket.split();
     let mut send_task = tokio::spawn(async move {
         // server sends this
 
+        let user = s_.clone();
         let sc = sc_.clone();
-        let user = s_;
 
         while let Ok(msg) = rx.recv().await {
-            sqlx::query("insert into message(channel_id, content, author, timestamp) values($1, $2, $3, $4);")
-                .bind(sc.lock().await.channel_id)
-                .bind(msg.clone())
-                .bind(user.id)
-                .bind(utils::get_time())
-                .execute(&db)
-                .await.unwrap();
             let _ = sender.send(ws::Message::Text(msg)).await;
         }
     });
@@ -153,20 +171,34 @@ async fn message_socket(
     let sc_ = socket_container.clone();
     let mut recv_task = tokio::spawn(async move {
         // server receives this
-        let mut cnt = 0;
 
-        let user = s_;
-        let sc = sc_;
+        let user = s_.clone();
+        let sc = sc_.clone();
 
         while let Some(Ok(msg)) = receiver.next().await {
-            cnt += 1;
             let msg = msg.into_text().unwrap();
-            let _ = sc.clone().lock().await.clone().broadcast(format!("{} : {msg}", user.user));
-            if msg == "quit".to_string() {
-                return cnt;
+            let candidate = serde_json::from_str::<SentMessage>(msg.as_str());
+
+            match candidate {
+                Ok(e) => {
+                    println!("{e:?}");
+
+                    sqlx::query("insert into message(channel_id, content, author, timestamp) values($1, $2, $3, $4);")
+                        .bind(sc.lock().await.channel_id)
+                        .bind(msg.clone())
+                        .bind(user.user.clone())
+                        .bind(utils::get_time())
+                        .execute(&db)
+                        .await.unwrap();
+        
+                    let _ = sc.clone().lock().await.clone().broadcast(msg.clone());
+                }
+                Err(_) => {
+                    println!("unable to parse");
+                    return;
+                }
             }
         }
-        cnt
     });
 
     tokio::select! {
