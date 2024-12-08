@@ -18,7 +18,7 @@ futures-util = "0.3.31"
 
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-tower-http = { version = "0.6.1", features = ["fs", "trace"] }
+tower-http = { version = "0.6.1", features = ["fs", "trace", "cors"] }
 
 thiserror = "2.0.3"
 

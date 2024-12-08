@@ -1,9 +1,9 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use axum::{extract::FromRef, http::StatusCode, response::{IntoResponse, Response}, routing::{any, get, post}, Router};
+use axum::{extract::FromRef, http::{self, StatusCode}, response::{IntoResponse, Response}, routing::{any, get, post}, Router};
 use futures::lock::Mutex;
 use tokio::sync::broadcast;
-use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tower_http::{cors::{Any, CorsLayer}, trace::{DefaultMakeSpan, TraceLayer}};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use rand::{thread_rng, Rng};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
@@ -32,7 +32,7 @@ pub struct AppState {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() {    
     let app = Router::new()
         .route("/", get(|| async { "hermes at your service" }))
         .route("/user/login", post(user::login))
@@ -54,6 +54,12 @@ async fn main() {
         .route("/message/fetch", post(message::fetch))
 
         .route("/message/debug_state", get(ws_statemachine::debug_state))
+
+        .layer(
+            CorsLayer::new()
+                .allow_methods(Any)
+                .allow_origin(Any)
+        )
 
         .with_state(
             AppState {

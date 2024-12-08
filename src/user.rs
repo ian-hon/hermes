@@ -68,10 +68,21 @@ pub async fn login(
     State(db): State<Pool<Sqlite>>,
     WithRejection(Json(user_info), _): WithRejection<Json<User>, ExtractorError>
 ) -> impl IntoResponse {
+    // Success(string)
+    // PasswordWrong
+    // UsernameNoExist
+
+    // extractor errors
+    
     serde_json::to_string(&User::login(&db, user_info.username, user_info.password).await).unwrap()
 }
 
 pub async fn signup(State(db): State<Pool<Sqlite>>, WithRejection(Json(user_info), _): WithRejection<Json<User>, ExtractorError>) -> impl IntoResponse {
-    // input sanitization for this
+    // Success(String)
+    // UsernameExist
+
+    // extractor errors
+
+    // TODO: input sanitization for this
     serde_json::to_string(&User::signup(&db, user_info.username, user_info.password).await).unwrap()
 }
