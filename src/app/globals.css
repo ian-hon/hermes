@@ -1,6 +1,26 @@
 :root {
-    --background: #000;
-    --foreground: #fff;
+    --text: #e2e1f9;
+    --background: #070621;
+    --primary: #8381e8;
+    --secondary: #2a2875;
+    --background-secondary: rgba(255, 255, 255, 0.03);
+    /* --accent: #f9fd14; */
+    /* --accent: #e114c9; */
+    --accent: #d2d2f9;
+
+    --border-radius:30px;
+
+    /* Noto Sans Tai Le */
+    /* Noto Sans Nandinagari */
+    /* Fragment Mono */
+    /* PT Mono */
+    /* Noto Sans Ol Chiki */
+    /* Noto Sans Thai Looped */
+    /* Noto Sans Sinhala */
+
+    /* Sometype Mono */
+    /* Geist Mono */
+    /* Oxygen Mono */
 }
 
 html,
@@ -10,11 +30,34 @@ body {
 }
 
 body {
-    color: var(--foreground);
+    color: var(--text);
     background: var(--background);
-    font-family: Arial, Helvetica, sans-serif;
+    /* font-family: Arial, Helvetica, sans-serif; */
+    font-family:var(--geistmono-font);
+    font-weight:300;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, input {
+    font-family:var(--geistmono-font);
+    font-weight:300;
+}
+
+h1 {
+    font-size:35px;
+}
+
+h2, input {
+    font-size:20px;
+}
+
+h3 {
+    font-size:18px;
+}
+
+h4 {
+    font-size:16px;
 }
 
 * {

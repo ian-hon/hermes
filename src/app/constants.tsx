@@ -1,0 +1,1 @@
+export const BACKEND_ADDRESS = 'https://backend.ianhon.com/hermes';
