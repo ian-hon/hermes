@@ -59,6 +59,7 @@ async fn main() {
             CorsLayer::new()
                 .allow_methods(Any)
                 .allow_origin(Any)
+                .allow_headers(Any)
         )
 
         .with_state(
