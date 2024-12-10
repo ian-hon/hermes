@@ -37,8 +37,8 @@ export function parseResponse(r: any) {
 }
 
 
-export function fetchCookie(name: string) {
-    var result = undefined;
+export function fetchCookie(name: string): string | null {
+    var result = null;
     document.cookie.split(';').forEach(element => {
         let x = element.trim().split("=");
         if (x[0] == name) {
@@ -46,4 +46,8 @@ export function fetchCookie(name: string) {
         }
     });
     return result;
+}
+
+export function setCookie(name: string, value: any) {
+    document.cookie = `${name}=${value}`;
 }
