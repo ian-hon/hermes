@@ -85,10 +85,23 @@
                 }
             }
             
-            &#confirmPassword[aria-label='show'] {
-                display:none;
+            &#confirmPassword {
+                opacity: 1;
+                transition-duration: 0.3s;
+            
+                &[aria-label='hide'] {
+                    font-size:0;
+                    opacity: 0;
+                    pointer-events: none;
+                }
             }
         }
+    }
+
+    & #message {
+        color:var(--error);
+        text-align:center;
+        margin-top:1.5em;
     }
 
     & #action {
@@ -97,7 +110,7 @@
         align-items:center;
         flex-direction: column;
 
-        margin-top:3em;
+        margin-top:2em;
 
         & h2 {
             opacity: 0.8;

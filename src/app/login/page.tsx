@@ -16,8 +16,11 @@ export default function loginPage() {
 
     const [showPassword, toggleShowPassword] = useState(false);
 
+    const [message, changeMessage] = useState('');
+    const [passwordsVerified, changePasswordVerification] = useState(false);
+
     function attemptLogin(): any {
-        sendPostRequest(`${BACKEND_ADDRESS}/user/login`, {
+        sendPostRequest(`${BACKEND_ADDRESS}/user/${userState ? 'login' : 'signup'}`, {
             "username": username,
             "password": password
         }, (r: any) => {
@@ -25,235 +28,34 @@ export default function loginPage() {
             if (response['Success'] != undefined) {
                 setCookie("session", response['Success']);
                 setCookie("username", username);
-                // localStorage.setItem("session", response['Success']);
-                // localStorage.setItem("username", username);
                 redirect("/");
+            } else {
+                changeMessage(
+                    (): string => {
+                        switch (response) {
+                            case "UsernameNoExist":
+                                return "username doesnt exist";
+                            case "PasswordWrong":
+                                return "incorrect password";
+                            case "UsernameExist":
+                                return "username taken";
+                            default:
+                                return '';
+                        }
+                    }
+                );
             }
         })
     }
-
-    function placeholder() {
-        return <div id={styles.main}>
-        <div id={styles.container}>
-            <div id={styles.header}>
-                <Image src={'/hermes_icon.png'} alt='' width={150} height={150}></Image>
-                <h1>
-                    hermes
-                </h1>
-                <h4>
-                    messenger for the gods
-                </h4>
-            </div>
-            <div id={styles.userFields}>
-                <input id={styles.username} value={username} onChange={(e) => changeUsername(e.target.value)} placeholder="username"/>
-                <div>
-                    <input type={ showPassword ? "text" : "password" } id={styles.password} value={password} onChange={(e) => changePassword(e.target.value)} placeholder="password"/>
-                    <Image onClick={() => { toggleShowPassword(!showPassword) }} src={ showPassword ? "/eye.svg" : "/eye_hide.svg"} alt='' height='50' width='50'/>
-                </div>
-                <div>
-                    <input type="password" aria-label={ userState ? 'log' : 'sign' } id={styles.confirmPassword} value={confirmPassword} onChange={(e) => changeConfirmPassword(e.target.value)} placeholder="confirm your password"/>
-                </div>
-                <div id={styles.actions}>
-                    <h2 onClick={attemptLogin}>
-                        { userState ? 'log in' : 'sign up' }
-                    </h2>
-                    <h4 onClick={() => { changeUserState(!userState); }}>
-                        { userState ? 'no account? sign up' : 'have an account? log in' }
-                    </h4>
-                </div>
-            </div>
-        </div>
-    </div>;
-    /*
-#main {
-    display:flex;
-    justify-content: center;
-    align-items: center;
-
-    height:100vh;
-    width:100vw;
-}
-
-#container {
-    display:flex;
-    justify-content: space-between;
-    align-items: center;
-
-    flex-direction: column;
-
-    min-width:40vw;
-    min-height:50vh;
-
-    padding: 8vh 10vw 8vh 10vw;
-
-    border-style: solid;
-    border-width: var(--border-width);
-
-    & #header {
-        display:flex;
-        justify-content: center;
-        align-items: center;
-
-        flex-direction: column;
-
-        & img {
-            height:5em;
-            width:5em;
-
-            margin-bottom:1em;
-        }
-
-        & h1 {
-            font-weight:500;
-        }
     
-        & h4 {
-            font-weight:400;
-            font-style:italic;
-            opacity: 0.5;
-        }
-    }
-
-    & #userFields {
-        display:flex;
-        justify-content: center;
-        align-items:center;
-        flex-direction: column;
-
-        width:100%;
-
-        margin-top:2.5em;
-
-        & > div {
-            margin-top: 1em;
-
-            &:has(#password) {
-                display:flex;
-                justify-content: center;
-                align-items: center;
-
-                position:relative;
-
-                & img {
-                    position:absolute;
-                    right:1ch;
-
-                    margin-top:1em;
-
-                    height: 1.5em;
-                    width: 1.5em;
-
-                    opacity: 0.5;
-
-                    cursor:pointer;
-                }
-            }
+    function verifyPasswords() {
+        if (password.length == 0) {
+            changePasswordVerification(false);
         }
 
-        & input {
-            border-collapse: collapse;
-            border-style: none;
-            background:none;
-
-            color:var(--text);
-
-            font-weight:400;
-            outline: none;
-
-            margin-top: 1em;
-
-            height:1.5em;
-
-            border-style: solid;
-            border-width:0;
-            border-bottom-width:1px;
-
-            transition-duration:0.3s;
-
-            &#confirmPassword {
-                height:0;
-                margin-top:-1em;
-    
-                opacity: 0;
-    
-                transition-duration:0.3s;
-            
-                &[aria-label='sign'] {
-                    opacity: 1;
-                    margin-top: 0;
-                    height:1.5em;
-                }
-            }
-    
-            &:last-child {
-                margin-top: 0;
-            }
-    
-            &::placeholder {
-                opacity: 0.5;
-                font-style:italic;
-                font-size:18px;
-            }
-
-            &:focus {
-                border-color:var(--text);
-            }
+        if (password != confirmPassword) {
+            changePasswordVerification(false);
         }
-
-        & #actions {
-            display:flex;
-            justify-content: center;
-            align-items:center;
-            flex-direction: column;
-
-            margin-top:2.5em;
-
-            & h2 {
-                background: var(--secondary);
-
-                padding:0.3em 2ch;
-                border-radius:var(--border-radius);
-
-                font-weight:400;
-
-                cursor:pointer;
-                user-select: none;
-                -webkit-user-select: none;
-
-                transition-duration:0.2s;
-
-                &:hover {
-                    transform:translateY(-5px);
-                }
-
-                &:active {
-                    opacity: 0.8;
-                    transform:scale(0.98) translateY(-5px);
-                }
-            }
-
-            & h4 {
-                font-weight:600;
-                font-style:italic;
-                opacity: 0.5;
-
-                margin-top: 0.3em;
-
-                cursor:pointer;
-
-                transition-duration: 0.3s;
-
-                user-select: none;
-                -webkit-user-select: none;
-
-                &:hover {
-                    opacity: 1;
-                }
-            }
-        }
-    }
-}
-     */
     }
     
     return <div id={styles.main}>
@@ -281,28 +83,29 @@ export default function loginPage() {
                         <td>
                             <h3>password {'>'} </h3>
                         </td>
-                        {/* poor password protection? */}
                         <td>
-                            {/* TODO : password is replaced with * when toggled */}
-                            <input value={showPassword ? password : ('*'.repeat(password.length))} onChange={(e) => { changePassword(e.target.value); }}/>
+                            <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => { changePassword(e.target.value); verifyPasswords(); }}/>
                             <Image onClick={() => { toggleShowPassword(!showPassword) }} src={showPassword ? '/eye.svg' : '/eye_hide.svg'} alt='' width={25} height={25}></Image>
                         </td>
                     </tr>
-                    <tr id={styles.confirmPassword} aria-label={ userState ? 'show' : '' }>
+                    <tr id={styles.confirmPassword} aria-label={ userState ? 'hide' : 'show' }>
                         <td>
                             <h3>confirm password {'>'} </h3>
                         </td>
                         <td>
-                            <input value={'*'.repeat(confirmPassword.length)} onChange={(e) => { changeConfirmPassword(e.target.value); }}/>
+                            <input type='password' value={confirmPassword} onChange={(e) => { changeConfirmPassword(e.target.value); verifyPasswords(); }}/>
                         </td>
                     </tr>
                 </tbody>
             </table>
+            <h3 id={styles.message}>
+                { passwordsVerified ? message : (!userState && (password != confirmPassword) ? 'passwords do not match' : message) }
+            </h3>
             <div id={styles.action}>
                 <h2 onClick={attemptLogin}>
                     [ { userState ? 'log in' : 'sign up' } ]
                 </h2>
-                <h4 onClick={() => { changeUserState(!userState); }}>
+                <h4 onClick={() => { changeUserState(!userState); changeMessage('') }}>
                     { userState ? 'no account? sign up' : 'have an account? log in' }
                 </h4>
             </div>
