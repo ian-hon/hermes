@@ -8,12 +8,14 @@
     /* --accent: #e114c9; */
     --accent: #d2d2f9;
 
-    --border-radius:30px;
+    --border-radius:10px;
 
     --text: #00dd00;
-    --border-width:0.5px;
+    --border-width:1px;
 
     --error: #f00;
+
+    --container-margin: 5px;
 
     /* Noto Sans Tai Le */
     /* Noto Sans Nandinagari */

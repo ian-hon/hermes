@@ -1,3 +1,9 @@
+export function sessionObject(s: string): any {
+    return {
+        "id": s
+    };
+}
+
 export async function sendGetRequest(url: string, func: any) {
     var http = new XMLHttpRequest();
     http.onreadystatechange = function() {
