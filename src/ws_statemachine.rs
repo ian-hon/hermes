@@ -14,14 +14,15 @@ use tokio::sync::broadcast;
 pub enum MessageSpecies {
     // to be sent to open websockets
     UserParticipation(String, bool), // X joined, left; true -> joined
-    Typical(SentMessage),
+    Typical(Message),
     Deletion(i32),
     Edit(i32, String),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Message {
     // what users receive
+    pub id: i32,
     pub author: String,
     pub content: String,
     pub timestamp: i64,
@@ -163,19 +164,19 @@ async fn message_socket(
 
             match candidate {
                 Ok(e) => {
+                    let sent_time = utils::get_time();
 
-                    sqlx::query("insert into message(channel_id, content, author, timestamp) values($1, $2, $3, $4);")
+                    let r = sqlx::query("insert into message(channel_id, content, author, timestamp) values($1, $2, $3, $4);")
                         .bind(sc.lock().await.channel_id)
                         .bind(serde_json::to_string(&e).unwrap())
                         .bind(user.user.clone())
-                        .bind(utils::get_time())
+                        .bind(sent_time)
                         .execute(&db)
-                        .await.unwrap();
+                        .await.unwrap().last_insert_rowid();
         
-                    let _ = sc.clone().lock().await.clone().broadcast(MessageSpecies::Typical(e));
+                    let _ = sc.clone().lock().await.clone().broadcast(MessageSpecies::Typical(Message { id: r as i32, author: user.user.clone(), content: e.content, timestamp: sent_time, reply: e.reply, image: e.image }));
                 }
                 Err(_) => {
-                    println!("unable to parse");
                     return;
                 }
             }
