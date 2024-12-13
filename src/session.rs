@@ -86,7 +86,7 @@ impl RawSessionID {
     pub fn to_int(self) -> Result<i64, SessionError> {
         match i64::from_str_radix(&self.id.replace("-", ""), 16) {
             Ok(i) => Ok(i),
-            Err(_) => Err(SessionError::Invalid)
+            Err(_) => Err(SessionError::SessionIDInvalid)
         }
     }
 
@@ -96,8 +96,8 @@ impl RawSessionID {
                 match Session::fetch_by_id(db, i, true).await {
                     Some(s) => Ok(s), // exist, not expired
                     None => match Session::fetch_by_id(db, i, false).await {
-                        Some(_) => Err(SessionError::Expired), // exists, but expired
-                        None => Err(SessionError::NoExist) // doesnt exist
+                        Some(_) => Err(SessionError::SessionIDExpired), // exists, but expired
+                        None => Err(SessionError::SessionIDNoExist) // doesnt exist
                     }
                 }
             }
@@ -108,9 +108,9 @@ impl RawSessionID {
 
 #[derive(Serialize, Deserialize)]
 pub enum SessionError {
-    NoExist,
-    Expired,
-    Invalid
+    SessionIDNoExist,
+    SessionIDExpired,
+    SessionIDInvalid
 }
 
 async fn generate_id(db: &Pool<Sqlite>) -> i64 {
