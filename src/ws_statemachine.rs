@@ -24,7 +24,7 @@ pub struct Message {
     // what users receive
     pub id: i32,
     pub author: String,
-    pub content: String,
+    pub content: String, // serialised version of SentMessage
     pub timestamp: i64,
     pub edited_timestamp: i64, // -1 means non edited
     pub reply: Option<i32>,

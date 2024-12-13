@@ -9,7 +9,7 @@ use sqlx::{prelude::FromRow, Pool, Sqlite};
 use futures::{lock::Mutex, sink::SinkExt, stream::StreamExt};
 use tokio::sync::broadcast;
 
-use crate::{channel::Channel, extractor_error::ExtractorError, hermes_error::{self, HermesError, HermesFormat}, permission::{self, permission_check, user_permission_check, PermissionError}, session::{RawSessionID, Session}, user, utils, ws_statemachine::{MessageSpecies, SentMessage, SocketContainer}, AppState};
+use crate::{channel::Channel, extractor_error::ExtractorError, hermes_error::{self, HermesError, HermesFormat}, permission::{self, permission_check, user_permission_check, PermissionError}, session::{RawSessionID, Session}, user, utils, ws_statemachine::{Message, MessageSpecies, SentMessage, SocketContainer}, AppState};
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct RawMessage {
@@ -22,6 +22,20 @@ pub struct RawMessage {
     pub edited_timestamp: i32,
 }
 impl RawMessage {
+    pub fn to_message(&self) -> Message {
+        let sent_message = serde_json::from_str::<SentMessage>(&self.content).unwrap();
+
+        Message {
+            id: self.id,
+            author: self.author.clone(),
+            content: self.content.clone(),
+            timestamp: self.timestamp as i64,
+            edited_timestamp: self.edited_timestamp as i64,
+            reply: sent_message.reply,
+            image: sent_message.image
+        }
+    }
+
     pub async fn fetch(db: &Pool<Sqlite>, id: i32) -> Option<RawMessage> {
         sqlx::query_as::<_, RawMessage>("select * from message where id = $1;")
             .bind(id)
@@ -29,12 +43,15 @@ impl RawMessage {
             .await.unwrap()
     }
 
-    pub async fn fetch_from_channel(db: &Pool<Sqlite>, channel_id: i32, amount: i32) -> Vec<RawMessage> {
+    pub async fn fetch_from_channel(db: &Pool<Sqlite>, channel_id: i32, amount: i32) -> Vec<Message> {
         sqlx::query_as::<_, RawMessage>("select * from message where channel_id = $1 order by timestamp desc limit $2;")
             .bind(channel_id)
             .bind(amount)
             .fetch_all(db)
             .await.unwrap()
+            .iter()
+            .map(|x| x.to_message())
+            .collect::<Vec<Message>>()
     }
 
     pub async fn send(db: &Pool<Sqlite>, channel_id: i32, content: String, author: String) {
