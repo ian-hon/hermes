@@ -18,7 +18,8 @@ pub struct RawMessage {
     pub channel_id: i32,
     pub content: String,
     pub author: String,
-    pub timestamp: i32
+    pub timestamp: i32,
+    pub edited_timestamp: i32,
 }
 impl RawMessage {
     pub async fn fetch(db: &Pool<Sqlite>, id: i32) -> Option<RawMessage> {
@@ -55,15 +56,16 @@ impl RawMessage {
             .await.unwrap();
     }
 
-    pub async fn edit(db: &Pool<Sqlite>, id: i32, new_content: String) {
+    pub async fn edit(db: &Pool<Sqlite>, id: i32, new_content: String, edited_timestamp: i32) {
         match RawMessage::fetch(db, id).await {
             Some(m) => {
                 // no error handling after unwrapping because if there is something wrong, IT SHOULD PANIC
                 let mut sent_message = serde_json::from_str::<SentMessage>(&m.content).unwrap();
                 sent_message.content = new_content;
 
-                sqlx::query("update message set content = $1 where id = $2;")
+                sqlx::query("update message set content = $1, edited_timestamp = $2 where id = $3;")
                     .bind(serde_json::to_string(&sent_message).unwrap())
+                    .bind(edited_timestamp)
                     .bind(id)
                     .execute(db)
                     .await.unwrap();
@@ -141,12 +143,13 @@ pub async fn edit(
                 }
 
                 let new_content = utils::from_query("new_content", &query);
-                RawMessage::edit(&db, m.id, new_content.clone()).await;
+                let edited_timestamp = utils::get_time() as i32;
+                RawMessage::edit(&db, m.id, new_content.clone(), edited_timestamp).await;
 
                 let b = app_state.ws_set.lock().await;
                 match b.get(&m.channel_id) {
                     Some(s) => {
-                        s.lock().await.broadcast(MessageSpecies::Edit(m.id, new_content));
+                        s.lock().await.broadcast(MessageSpecies::Edit(m.id, new_content, edited_timestamp));
                     },
                     // no subscribers to channel, dont need to do anything
                     None => {}

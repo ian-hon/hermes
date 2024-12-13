@@ -15,8 +15,8 @@ pub enum MessageSpecies {
     // to be sent to open websockets
     UserParticipation(String, bool), // X joined, left; true -> joined
     Typical(Message),
-    Deletion(i32),
-    Edit(i32, String),
+    Deletion(i32), // message id
+    Edit(i32, String, i32), // message id, new content, edited timestamp
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -26,6 +26,7 @@ pub struct Message {
     pub author: String,
     pub content: String,
     pub timestamp: i64,
+    pub edited_timestamp: i64, // -1 means non edited
     pub reply: Option<i32>,
     pub image: Option<String> // source link?
 }
@@ -166,15 +167,16 @@ async fn message_socket(
                 Ok(e) => {
                     let sent_time = utils::get_time();
 
-                    let r = sqlx::query("insert into message(channel_id, content, author, timestamp) values($1, $2, $3, $4);")
+                    let r = sqlx::query("insert into message(channel_id, content, author, timestamp, edited_timestamp) values($1, $2, $3, $4, $5);")
                         .bind(sc.lock().await.channel_id)
                         .bind(serde_json::to_string(&e).unwrap())
                         .bind(user.user.clone())
                         .bind(sent_time)
+                        .bind(-1)
                         .execute(&db)
                         .await.unwrap().last_insert_rowid();
         
-                    let _ = sc.clone().lock().await.clone().broadcast(MessageSpecies::Typical(Message { id: r as i32, author: user.user.clone(), content: e.content, timestamp: sent_time, reply: e.reply, image: e.image }));
+                    let _ = sc.clone().lock().await.clone().broadcast(MessageSpecies::Typical(Message { id: r as i32, author: user.user.clone(), content: e.content, timestamp: sent_time, edited_timestamp: -1, reply: e.reply, image: e.image }));
                 }
                 Err(_) => {
                     return;
