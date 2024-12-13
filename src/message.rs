@@ -28,7 +28,7 @@ impl RawMessage {
         Message {
             id: self.id,
             author: self.author.clone(),
-            content: self.content.clone(),
+            content: sent_message.content.clone(),
             timestamp: self.timestamp as i64,
             edited_timestamp: self.edited_timestamp as i64,
             reply: sent_message.reply,
