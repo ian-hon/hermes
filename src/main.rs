@@ -48,7 +48,7 @@ async fn main() {
         .route("/roles/edit", post(not_implemented_yet))
         .route("/roles/fetch", post(role::fetch_all))
 
-        .route("/message/send", any(ws_statemachine::message_socket_handler))
+        .route("/message/ws", get(ws_statemachine::message_socket_handler))
         .route("/message/delete", post(message::delete))
         .route("/message/edit", post(message::edit))
         .route("/message/fetch", post(message::fetch))
