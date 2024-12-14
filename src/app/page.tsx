@@ -26,6 +26,7 @@ export default function Home() {
 
     const [ws, changeWs] = useState<WebSocket | undefined>(undefined);
     const [messages, changeMessages] = useState<Array<Message>>([]);
+    const [userInput, changeUserInput] = useState('');
 
     ws?.addEventListener("open", () => {
 
@@ -40,7 +41,6 @@ export default function Home() {
 
         try {
             r = JSON.parse(m.data);
-            console.log(r);
         } catch (error) {
             console.log(`e : ${error}`);
             return;
@@ -179,18 +179,46 @@ export default function Home() {
     }
 
     function Messages({}): React.JSX.Element {
+        let addGroup = (u: string) => {
+            s.push(
+                <div className={styles.messageGroup} key={s.length}>
+                    <h3 id={styles.username}>
+                        {u}
+                    </h3>
+                    <div id={styles.container}>
+                        {
+                            c.map((e) => e)
+                        }
+                    </div>
+                </div>
+            );
+        }
+
         let s: Array<React.JSX.Element> = [];
+        let c: Array<React.JSX.Element> = [];
 
         let p = '';
         messages.forEach((m) => {
-            s.push(
-            <div className={styles.message} key={m.id}>
-                <h3 key={m.id}>
-                    {m.author == p ? " ".repeat(m.author.length) : m.author} : {m.content}
-                </h3>
-            </div>);
+            if (p != m.author) {
+                addGroup(p);
+
+                c = [];
+            }
+
+            c.push(
+                <div className={styles.message} key={m.id}>
+                    <h3>
+                        :
+                    </h3>
+                    <h3 key={m.id}>
+                        {m.content}
+                    </h3>
+                </div>
+            );
+
             p = m.author;
         })
+        addGroup(p);
 
         return <>
             {
@@ -258,19 +286,20 @@ export default function Home() {
         </div>
         <div id={styles.messageBox} className={styles.container}>
             <div id={styles.container}>
-                {/* {
-                    messages.map((e) =>
-                        <div className={styles.message}>
-                            <h3 key={e.id}>
-                                {e.author} : {e.content}
-                            </h3>
-                        </div>
-                    )
-                } */}
                 <Messages/>
             </div>
             <div id={styles.textbox}>
-
+                <hr/>
+                <div>
+                    <h3>{'>'}</h3>
+                    <input value={userInput} onChange={(e) => { changeUserInput(e.target.value) }} onKeyDownCapture={(e) => { 
+                        if (e.key == 'Enter') {
+                            ws?.send(JSON.stringify({ "content":userInput }));
+                            changeUserInput('');
+                        }
+                    }}>
+                    </input>
+                </div>
             </div>
         </div>
         <div id={styles.memberList} className={styles.container}>

@@ -181,10 +181,59 @@
         width:100%;
         flex:1;
     }
+    
+    & #textbox {
+        width:100%;
+        margin-top:0.5em;
+
+        & hr {
+            border-color: var(--text);
+            border-width: 0;
+            border-bottom-width:calc(var(--border-width) * 0.5);
+        }
+
+        & > div {
+            display:flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+
+            margin:0.5em 0 0 0;
+
+            & > h3 {
+                margin-right:1ch;
+                margin-left:1ch;
+            }
+
+            & input {
+                flex:1;
+            }
+        }
+    }
+
+    .messageGroup {
+        display:flex;
+        justify-content: flex-start;
+        align-items:flex-start;
+
+        flex-direction: row;
+
+        & #username {
+            margin-right: 1ch;
+        }
+    }
 
     .message {
+        display:flex;
+        justify-content: flex-start;
+        align-items: flex-start;
+
         & h3 {
-            white-space: pre;
+            /* white-space: pre; */
+            text-overflow:clip;
+
+            &:first-child {
+                margin-right: 1ch;
+            }
         }
     }
 }
