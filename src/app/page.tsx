@@ -10,6 +10,7 @@ import { fetchCookie, sendPostRequest, sessionObject } from "./utils";
 import GearIcon from './assets/gear.svg';
 import LogoutArrowIcon from './assets/logout_arrow.svg';
 import LogoutDoorIcon from './assets/logout_door.svg';
+import CrossIcon from './assets/cross.svg';
 
 import { Channel, Message } from './hermes_types';
 import { BACKEND_ADDRESS, WS_BACKEND_ADDRESS } from "./constants";
@@ -26,14 +27,19 @@ export default function Home() {
 
     const [ws, changeWs] = useState<WebSocket | undefined>(undefined);
     const [messages, changeMessages] = useState<Array<Message>>([]);
+
     const [userInput, changeUserInput] = useState('');
+    const [repliedMessage, changeRepliedMessage] = useState<Message | undefined>(undefined);
 
     ws?.addEventListener("open", () => {
-
+        console.log('websocket opened');
     })
 
     ws?.addEventListener("close", () => {
         changeMessages([]);
+        changeChannel(undefined);
+        // typically means a crash
+        console.log('websocket closed');
     })
 
     ws?.addEventListener("message", (m) => {
@@ -42,7 +48,6 @@ export default function Home() {
         try {
             r = JSON.parse(m.data);
         } catch (error) {
-            console.log(`e : ${error}`);
             return;
         }
 
@@ -206,13 +211,20 @@ export default function Home() {
             }
 
             c.push(
-                <div className={styles.message} key={m.id}>
-                    <h3>
-                        :
-                    </h3>
-                    <h3 key={m.id}>
-                        {m.content}
-                    </h3>
+                <div className={styles.message} key={m.id} id={repliedMessage == m ? styles.replied : ''}>
+                    <div id={styles.content}>
+                        <h3>
+                            :
+                        </h3>
+                        <h3 key={m.id}>
+                            {m.content}
+                        </h3>
+                    </div>
+                    <div id={styles.replyButton}>
+                        <h4 onClick={() => { changeRepliedMessage(m) }}>
+                            reply
+                        </h4>
+                    </div>
                 </div>
             );
 
@@ -290,12 +302,28 @@ export default function Home() {
             </div>
             <div id={styles.textbox}>
                 <hr/>
+                {
+                    repliedMessage == undefined ? <></> : 
+                    <>
+                        <div id={styles.repliedMessage}>
+                            <div>
+                                <h3>replying : </h3>
+                                <h3>
+                                    { repliedMessage?.content }
+                                </h3>
+                            </div>
+                            <Image onClick={() => { changeRepliedMessage(undefined) }} src={CrossIcon} alt='' width={25} height={25} />
+                        </div>
+                        <hr/>
+                    </>
+                }
                 <div>
                     <h3>{'>'}</h3>
                     <input value={userInput} onChange={(e) => { changeUserInput(e.target.value) }} onKeyDownCapture={(e) => { 
                         if (e.key == 'Enter') {
-                            ws?.send(JSON.stringify({ "content":userInput }));
+                            ws?.send(JSON.stringify({ "content":userInput, "reply": repliedMessage?.id }));
                             changeUserInput('');
+                            changeRepliedMessage(undefined);
                         }
                     }}>
                     </input>

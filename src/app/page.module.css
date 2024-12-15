@@ -163,7 +163,8 @@
 }
 
 #messageBox {
-    flex:auto;
+    flex:1;
+    overflow:hidden;
 
     display:flex;
     justify-content: center;
@@ -179,7 +180,11 @@
         flex-direction: column;
 
         width:100%;
+        max-width: 100%;
+
         flex:1;
+
+        overflow-y:scroll;
     }
     
     & #textbox {
@@ -208,6 +213,48 @@
                 flex:1;
             }
         }
+
+        & #repliedMessage {
+            display:flex;
+            justify-content: space-between;
+            align-items: center;
+
+            overflow:hidden;
+            width:100%;
+
+            margin-bottom:0.5em;
+
+            & > div {
+                display:flex;
+                justify-content: flex-start;
+                align-items: center;
+
+                & h3 {
+                    min-width:fit-content;
+                    margin-right:1ch;
+                }
+
+                & h3:last-of-type {
+                    overflow:hidden;
+                    max-width:20ch;
+                    min-width: 20ch;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+            }
+
+            & img {
+                height:1em;
+                width:1em;
+                margin-right:1ch;
+
+                cursor:pointer;
+            }
+
+            & + hr {
+                opacity: 0.5;
+            }
+        }
     }
 
     .messageGroup {
@@ -217,6 +264,9 @@
 
         flex-direction: row;
 
+        max-width:100%;
+        width:100%;
+
         & #username {
             margin-right: 1ch;
         }
@@ -224,16 +274,65 @@
 
     .message {
         display:flex;
-        justify-content: flex-start;
-        align-items: flex-start;
+        justify-content: space-between;
+        align-items: center;
 
-        & h3 {
-            /* white-space: pre; */
-            text-overflow:clip;
+        width:100%;
 
-            &:first-child {
-                margin-right: 1ch;
+        & #content {
+            display:flex;
+            justify-content: flex-start;
+            align-items:flex-start;
+
+            width:calc(100% - 10ch);
+
+            & h3 {
+                &:last-child {
+                    width:100%;
+                    
+                    overflow-wrap: break-word;
+                    word-wrap:break-word;
+                    text-overflow: clip;
+                }
+    
+                &:first-child {
+                    margin-right: 1ch;
+                }
             }
+        }
+
+        & #replyButton {
+            display:flex;
+            justify-content: center;
+            align-items: center;
+
+            opacity: 0;
+
+            transition-duration:0.3s;
+
+            & h4 {
+                font-style:italic;
+                margin-right:1ch;
+
+                cursor:pointer;
+
+                &:hover {
+                    text-decoration: underline;
+                    text-underline-offset: 0.1em;
+                }
+            }
+        }
+
+        &:hover {
+            background: color-mix(in srgb, var(--text) 10%, transparent);
+
+            & #replyButton {
+                opacity: 1;
+            }
+        }
+
+        &#replied {
+            background: color-mix(in srgb, var(--text) 30%, transparent);
         }
     }
 }

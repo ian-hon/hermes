@@ -18,6 +18,8 @@ export async function sendGetRequest(url: string, func: any) {
 }
 
 export async function sendPostRequest(url: string, body: any, func: any) {
+    console.log(url);
+
     var http = new XMLHttpRequest();
     http.onload = function() {
         if ((this.readyState == 4) && (this.status == 200)) {
