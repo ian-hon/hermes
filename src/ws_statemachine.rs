@@ -131,7 +131,7 @@ async fn message_socket(
         return;
     }
 
-    socket_container.lock().await.clone().add(s.user.clone());
+    socket_container.lock().await.add(s.user.clone());
     let mut rx = socket_container.lock().await.tx.subscribe();
 
     let _ = socket_container.lock().await.clone().broadcast(MessageSpecies::UserParticipation(s.user.clone(), true));
@@ -182,7 +182,7 @@ async fn message_socket(
                     return;
                 }
             }
-        }
+    }
     });
 
     tokio::select! {
@@ -191,6 +191,7 @@ async fn message_socket(
     };
 
     let _ = socket_container.lock().await.clone().broadcast(MessageSpecies::UserParticipation(s.user.clone(), false));
+    socket_container.lock().await.users.remove(&s.user.clone());
 }
 
 pub async fn debug_state(
