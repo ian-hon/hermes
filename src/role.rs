@@ -36,17 +36,19 @@ edit
 */
 
 impl Role {
-    pub async fn create(db: &Pool<Sqlite>, channel_id: i32, name: String, colour: i32, content: i64, hierarchy: i32) {
+    pub async fn create(db: &Pool<Sqlite>, channel_id: i32, name: String, colour: i32, content: i64, hierarchy: i32) -> i64 {
         if channel::Channel::fetch_by_id(&db, channel_id).await.is_some() {
-            sqlx::query("insert into roles(channel_id, name, colour, content, hierarchy) values($1, $2, $3, $4, $5);")
+            return sqlx::query("insert into roles(channel_id, name, colour, content, hierarchy) values($1, $2, $3, $4, $5);")
                 .bind(channel_id)
                 .bind(name)
                 .bind(colour)
                 .bind(content)
                 .bind(hierarchy)
                 .execute(db)
-                .await.unwrap();
+                .await.unwrap().last_insert_rowid();
         }
+
+        -1
     }
 
     pub async fn hierarchy_check(db: &Pool<Sqlite>, imposer: i32, target: i32) -> bool {

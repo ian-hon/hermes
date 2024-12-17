@@ -5,13 +5,16 @@ use axum_extra::extract::WithRejection;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, Pool, Sqlite};
 
-use crate::{extractor_error::ExtractorError, hermes_error, permission::{user_permission_check, PermissionError, Permissions}, session::RawSessionID, utils, AppState};
+use crate::{extractor_error::ExtractorError, hermes_error, membership, permission::{user_permission_check, PermissionError, Permissions}, role, session::RawSessionID, utils, AppState};
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct Channel {
     pub id: i32,
-    name: String,
-    description: String
+    pub name: String,
+    pub description: String,
+    pub creator: String,
+    pub invite: i32,
+    pub default_role: i32
 }
 // create
 // delete
@@ -30,15 +33,21 @@ impl Channel {
     }
 
     pub async fn create(db: &Pool<Sqlite>, name: String, description: String, user: String) {
-        sqlx::query("insert into channel(name, description, creator) values($1, $2, $3)")
+        let channel_id = sqlx::query("insert into channel(name, description, creator, invite) values($1, $2, $3, $4)")
             .bind(name)
             .bind(description)
-            .bind(user)
+            .bind(user.clone())
+            .bind(membership::Membership::generate_invite(db).await)
+            .execute(db)
+            .await.unwrap().last_insert_rowid();
+
+        let role_id = role::Role::create(db, channel_id as i32, "member".to_string(), 65280, i64::MAX, 1).await; // remove all permissions later
+        sqlx::query("update channel set default_role = $1 where id = $2;")
+            .bind(role_id)
+            .bind(channel_id)
             .execute(db)
             .await.unwrap();
-
-        // create default role
-        // add user membership into this channel
+        membership::Membership::add_membership(db, user.clone(), channel_id as i32, role_id as i32).await;
     }
 
     pub async fn delete(db: &Pool<Sqlite>, channel: i32) {

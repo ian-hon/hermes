@@ -42,6 +42,9 @@ async fn main() {
         .route("/channel/delete", post(channel::delete))
         .route("/channel/edit", post(channel::edit))
         .route("/channel/fetch/all", post(channel::fetch_all))
+        .route("/channel/fetch_users", post(not_implemented_yet))
+
+        .route("/membership/join", post(membership::add_membership))
 
         .route("/roles/create", post(role::create))
         .route("/roles/delete", post(role::delete))
