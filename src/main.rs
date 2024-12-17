@@ -32,7 +32,7 @@ pub struct AppState {
 }
 
 #[tokio::main]
-async fn main() {    
+async fn main() {
     let app = Router::new()
         .route("/", get(|| async { "hermes at your service" }))
         .route("/user/login", post(user::login))

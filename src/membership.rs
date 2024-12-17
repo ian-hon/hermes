@@ -32,8 +32,13 @@ impl Membership {
     pub async fn use_invite(db: &Pool<Sqlite>, invite: i32, user: String) -> MembershipError {
         match Membership::get_invite(db, invite).await {
             Some(c) => {
-                Membership::add_membership(db, user, c.id, c.default_role).await;
-                MembershipError::Success
+                match Membership::fetch_membership(db, user.clone(), c.id).await {
+                    Some(_) => MembershipError::MembershipExists,
+                    None => {
+                        Membership::add_membership(db, user, c.id, c.default_role).await;
+                        MembershipError::Success
+                    }
+                }
             },
             None => MembershipError::InviteNoExist
         }
@@ -72,6 +77,7 @@ impl Membership {
 pub enum MembershipError {
     Success,
 
+    MembershipExists,
     InviteNoExist,
 }
 

@@ -27,7 +27,7 @@ pub async fn user_permission_check(db: &Pool<Sqlite>, user: &String, channel: i3
         .fetch_optional(db)
         .await
         .unwrap() {
-        Some(r) => permission_check(r.id, p),
+        Some(r) => permission_check(r.content, p),
         _ => PermissionError::NoPermission
     }
 }
@@ -40,8 +40,8 @@ pub fn generate_permission(p: Vec<Permissions>) -> i64 {
     result
 }
 
-pub fn permission_check(content: i32, p: Permissions) -> PermissionError {
-    if ((content >> (p as i32)) & 1) == 1 { PermissionError::Success } else { PermissionError::NoPermission }
+pub fn permission_check(content: i64, p: Permissions) -> PermissionError {
+    if ((content >> (p as i64)) & 1) == 1 { PermissionError::Success } else { PermissionError::NoPermission }
 }
 
 pub enum Permissions {
