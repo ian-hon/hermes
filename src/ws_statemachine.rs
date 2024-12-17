@@ -90,6 +90,7 @@ pub async fn message_socket_handler(
                 let socket_container = socket_container.clone();
 
                 if socket_container.lock().await.contains(s.user.clone()) {
+                    println!("{} already in socket container", s.user.clone());
                     return serde_json::to_string(&MessageWebsocketError::UserAlreadyConnected).unwrap().into_response();
                 }
 
@@ -199,6 +200,7 @@ pub async fn debug_state(
 ) -> String {
     let guard = app_state.ws_set.lock().await;
     let a = guard.clone();
+    println!("debug state : ");
     for i in a {
         let g = i.1.lock().await.clone();
         println!("{} : {:?}", i.0, g);
