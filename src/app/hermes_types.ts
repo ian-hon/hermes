@@ -1,31 +1,10 @@
-// export class Channel {
-//     public name: string;
-//     public id: number;
-
-//     public constructor(name: string, id: number) {
-//         this.name = name;
-//         this.id = id;
-//     }
-
-//     public from_json(s: ): Channel {
-//         return new Channel(
-//             s
-//         );
-//     }
-// }
-
 export interface Channel {
     id: number;
 
     name: string;
     description: string;
-}
 
-export interface MessageSpecies {
-    // UserParticipation(String, bool), // X joined, left; true -> joined
-    // Typical(SentMessage),
-    // Deletion(i32),
-    // Edit(i32, String)
+    invite: number;
 }
 
 export class Message {

@@ -1,3 +1,139 @@
+#parent {
+    position:relative;
+}
+
+#popup {
+    position:absolute;
+
+    z-index: 1000;
+
+    display:flex;
+    justify-content: center;
+    align-items: center;
+
+    width:100vw;
+    height:100vh;
+
+    pointer-events: none;
+
+    transition-duration:0.5s;
+
+    &[aria-label="channel"] {
+        backdrop-filter: blur(3px);
+        pointer-events: all;
+
+        & #channelPopup {
+            opacity: 1;
+        }
+    }
+
+    & #channelPopup {
+        display:flex;
+        justify-content: center;
+        align-items: center;
+
+        flex-direction: column;
+
+        position:absolute;
+
+        opacity: 0;
+
+        transition-duration: 0.3s;
+
+        & #close {
+            position:absolute;
+            right:0;
+            top:0;
+
+            height:1.5em;
+            width:1.5em;
+
+            transform:translateX(100%);
+
+            cursor:pointer;
+        }
+
+        & #sections {
+            display:flex;
+            justify-content: center;
+            align-items: center;
+
+            flex-direction: column;
+
+            padding:1em 3ch;
+
+            background:var(--background);
+
+            border-radius:var(--border-radius);
+            border-style:solid;
+            border-width:var(--border-width);
+
+            & > h2 {
+                margin-top:1em;
+                cursor:pointer;
+                user-select: none;
+
+                &:hover {
+                    font-weight:500;
+                }
+            }
+        }
+
+        & #inputGroups {
+            display:flex;
+            justify-content: center;
+            align-items: center;
+
+            width:100%;
+
+            & h2:first-of-type {
+                margin-right: 1ch;
+            }
+
+            & input {
+                border-style:solid;
+                border-width:0;
+                border-bottom-width: var(--border-width);
+
+                margin-bottom:0.5em;
+
+                &::placeholder {
+                    opacity: 0.5;
+                    color:var(--text);
+                    font-style:italic;
+                }
+            }
+        }
+
+        & #sections:first-child {
+            & input {
+                width:9ch;
+            }
+        }
+
+        & #hr {
+            display:flex;
+            justify-content: space-evenly;
+            align-items: center;
+
+            width:100%;
+
+            & hr {
+                width:calc(50% - 4ch);
+                opacity: 0.5;
+                border-color:var(--text);
+
+                margin:3.5em 0;
+            }
+
+            & h3 {
+                opacity: 0.5;
+                font-style:italic;
+            }
+        }
+    }
+}
+
 #main {
     display:flex;
     width:100vw;
@@ -25,8 +161,12 @@
         width:calc(30ch - calc(var(--container-margin) * 2));
     }
 
-    & #container {
-        & > h2 {
+    & #actions {
+        display:flex;
+        justify-content: space-between;
+        align-items: center;
+
+        & h2:first-of-type {
             width:fit-content;
 
             margin-bottom:0.25em;
@@ -36,11 +176,30 @@
             border-bottom-width: 1.5px;
             border-color:var(--text);
         }
-    
+
+        & h2:last-of-type {
+            margin-right:0.2ch;
+            font-weight:500;
+
+            cursor:pointer;
+
+            transition-duration:0.3s;
+
+            user-select: none;
+
+            &:hover {
+                transform:rotateZ(90deg);
+            }
+        }
+    }
+
+    & #container {
         & .channel {
             display:flex;
             justify-content: flex-start;
             align-items: center;
+
+            width:100%;
     
             font-size:16px;
     
@@ -48,6 +207,8 @@
             padding:0;
 
             user-select: none;
+
+            overflow: hidden;
     
             & div {
                 display:flex;
@@ -89,12 +250,16 @@
             }
     
             & h3 {
-                line-height:0;
-    
+                overflow:hidden;
+
                 margin:0;
                 padding:0;
-    
                 padding-left:0.5ch;
+
+                max-width:calc(100% - 5ch);
+
+                text-overflow: ellipsis;
+                white-space: nowrap;
 
                 cursor:pointer;
 

@@ -31,15 +31,10 @@ export default function Home() {
     const [userInput, changeUserInput] = useState('');
     const [repliedMessage, changeRepliedMessage] = useState<Message | undefined>(undefined);
 
+    const [popup, changePopup] = useState('');
+
     ws?.addEventListener("open", () => {
         console.log('websocket opened');
-    })
-
-    ws?.addEventListener("close", () => {
-        changeMessages([]);
-        changeChannel(undefined);
-        // typically means a crash
-        console.log('websocket closed');
     })
 
     ws?.addEventListener("message", (m) => {
@@ -53,7 +48,12 @@ export default function Home() {
 
         if (r.Typical != undefined) {
             changeMessages([...messages, r.Typical]);
+            return;
         }
+    })
+
+    ws?.addEventListener("error", () => {
+        ws.close();
     })
 
     useEffect(() => {
@@ -68,22 +68,22 @@ export default function Home() {
         // and they couldnt just give setState a callback????????
         changeSessionID(s);
 
-        const fetchData = async () => {
-            await sendPostRequest(`${BACKEND_ADDRESS}/channel/fetch/all`, sessionObject(s), (r: string) => {
-                let c: Array<Channel> = JSON.parse(r);
-
-                checkSession(JSON.parse(r));
-
-                let m = new Map();
-                c.forEach((e) => {
-                    m.set(e.id, e);
-                });
-                updateChannelMap(m);
-            });
-        }
-
-        fetchData();
+        fetchChannels(s);
     }, []);
+
+    const fetchChannels = async (s: string) => {
+        await sendPostRequest(`${BACKEND_ADDRESS}/channel/fetch/all`, sessionObject(s), (r: string) => {
+            let c: Array<Channel> = JSON.parse(r);
+
+            checkSession(JSON.parse(r));
+
+            let m = new Map();
+            c.forEach((e) => {
+                m.set(e.id, e);
+            });
+            updateChannelMap(m);
+        });
+    }
 
     function placeholder(): React.JSX.Element {
         return <div id={styles.main}>
@@ -171,13 +171,17 @@ export default function Home() {
 
     function changeChannel(id: number | undefined) {
         // channelList[activeChannelID]
+        ws?.close();
         selectChannelID(id);
         updateChannel(id == undefined ? undefined : channelMap.get(id));
+        console.log(activeChannel);
+        console.log(id, sessionID);
         changeWs(id == undefined ? undefined : new WebSocket(`${WS_BACKEND_ADDRESS}/message/ws?channel_id=${id}&session_id=${sessionID}`));
         changeMessages([]);
 
         if ((id != undefined) && (sessionID != undefined)) {
             sendPostRequest(`${BACKEND_ADDRESS}/message/fetch?channel_id=${id}&amount=50`, sessionObject(sessionID), (r: any) => {
+                console.log(JSON.parse(r));
                 changeMessages(JSON.parse(r).toReversed());
             })
         }
@@ -212,6 +216,14 @@ export default function Home() {
 
             c.push(
                 <div className={styles.message} key={m.id} id={repliedMessage == m ? styles.replied : ''}>
+                    {/* <div id={styles.replyContent}>
+                        <h3>
+                            {'>'}
+                        </h3>
+                        <h3>
+                            han_yuji : "bla bla bla"
+                        </h3>
+                    </div> */}
                     <div id={styles.content}>
                         <h3>
                             :
@@ -239,12 +251,16 @@ export default function Home() {
         </>
     }
 
-
     function ChannelList({}): React.JSX.Element {
         return <div id={styles.container} className={styles.container}>
-            <h2>
-                channels
-            </h2>
+            <div id={styles.actions}>
+                <h2>
+                    channels
+                </h2>
+                <h2 onClick={() => { changePopup('channel') }}>
+                    +
+                </h2>
+            </div>
             <div>
                 {
                     Array.from(channelMap.entries()).map((e) =>
@@ -275,63 +291,140 @@ export default function Home() {
                     <h3>
                         {activeChannel.description}
                     </h3>
+                    <h3>
+                        invite code : {activeChannel.invite.toString(16).padEnd(8, '0').slice(0, 4)}-{activeChannel.invite.toString(16).padEnd(8, '0').slice(4, 8)}
+                    </h3>
                 </>
             }
         </div>
     }
 
-    return <div id={styles.main}>
-        <div id={styles.channelList}>
-            <ChannelList/>
-            <div id={styles.userActions} className={styles.container}>
-                <h2>
-                    {username}
+    function ChannelPopup({}): React.JSX.Element {
+        const [joinCode, changeJoinCode] = useState('');
+        const [channelTitle, changeChannelTitle] = useState('');
+        const [channelDescription, changeChannelDescription] = useState('');
+
+        const joinChannel = async () => {
+            if (sessionID == undefined) {
+                return;
+            }
+
+            let invite = Number.parseInt(joinCode.replaceAll("-", ""), 16);
+            if (Number.isNaN(invite)) {
+                return;
+            }
+
+            sendPostRequest(`${BACKEND_ADDRESS}/membership/join?invite=${invite}`, sessionObject(sessionID), (r: any) => {
+                console.log(r);
+                fetchChannels(sessionID);
+                changePopup('');
+            })
+        }
+
+        const createChannel = async () => {
+            if (sessionID == undefined) {
+                return;
+            }
+
+            if (channelTitle.length <= 0) {
+                return;
+            }
+
+            sendPostRequest(`${BACKEND_ADDRESS}/channel/create?name=${encodeURIComponent(channelTitle)}&description=${encodeURIComponent(channelDescription)}`, sessionObject(sessionID), () => {
+                fetchChannels(sessionID);
+                changePopup('');
+            })
+        }
+
+        return <div id={styles.channelPopup}>
+            <Image onClick={() => { changePopup('') }} id={styles.close} src={CrossIcon} alt='' height={20} width={20}/>
+            <div id={styles.sections}>
+                <div id={styles.inputGroups}>
+                    <h2>join : </h2>
+                    <input placeholder="code" value={joinCode} onChange={(e) => { changeJoinCode(e.target.value) }}/>
+                </div>
+                <h2 onClick={() => { joinChannel() }}>
+                    [ join ]
                 </h2>
-                <div>
-                    <Image id={styles.gear} src={GearIcon} alt='' width={25} height={25}></Image>
-                    <div onClick={() => { redirect('login') }}>
-                        <Image src={LogoutDoorIcon} alt='' width={25} height={25}></Image>
-                        <Image src={LogoutArrowIcon} alt='' width={25} height={25}></Image>
+            </div>
+            <div id={styles.hr}>
+                <hr/>
+                <h3>or</h3>
+                <hr/>
+            </div>
+            <div id={styles.sections}>
+                <div id={styles.inputGroups}>
+                    <h2>name : </h2>
+                    <input placeholder="channel name" value={channelTitle} onChange={(e) => { changeChannelTitle(e.target.value) }}/>
+                </div>
+                <div id={styles.inputGroups}>
+                    <h2>description : </h2>
+                    <input placeholder="channel description" value={channelDescription} onChange={(e) => { changeChannelDescription(e.target.value) }}/>
+                </div>
+                <h2 onClick={() => { createChannel() }}>
+                    [ create ]
+                </h2>
+            </div>
+        </div>;
+    }
+
+    return <div id={styles.parent}>
+        <div id={styles.popup} aria-label={popup}>
+            <ChannelPopup/>
+        </div>
+        <div id={styles.main}>
+            <div id={styles.channelList}>
+                <ChannelList/>
+                <div id={styles.userActions} className={styles.container}>
+                    <h2>
+                        {username}
+                    </h2>
+                    <div>
+                        <Image id={styles.gear} src={GearIcon} alt='' width={25} height={25}></Image>
+                        <div onClick={() => { redirect('login') }}>
+                            <Image src={LogoutDoorIcon} alt='' width={25} height={25}></Image>
+                            <Image src={LogoutArrowIcon} alt='' width={25} height={25}></Image>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div id={styles.messageBox} className={styles.container}>
-            <div id={styles.container}>
-                <Messages/>
-            </div>
-            <div id={styles.textbox}>
-                <hr/>
-                {
-                    repliedMessage == undefined ? <></> : 
-                    <>
-                        <div id={styles.repliedMessage}>
-                            <div>
-                                <h3>replying : </h3>
-                                <h3>
-                                    { repliedMessage?.content }
-                                </h3>
+            <div id={styles.messageBox} className={styles.container}>
+                <div id={styles.container}>
+                    <Messages/>
+                </div>
+                <div id={styles.textbox}>
+                    <hr/>
+                    {
+                        repliedMessage == undefined ? <></> : 
+                        <>
+                            <div id={styles.repliedMessage}>
+                                <div>
+                                    <h3>replying : </h3>
+                                    <h3>
+                                        { repliedMessage?.content }
+                                    </h3>
+                                </div>
+                                <Image onClick={() => { changeRepliedMessage(undefined) }} src={CrossIcon} alt='' width={25} height={25} />
                             </div>
-                            <Image onClick={() => { changeRepliedMessage(undefined) }} src={CrossIcon} alt='' width={25} height={25} />
-                        </div>
-                        <hr/>
-                    </>
-                }
-                <div>
-                    <h3>{'>'}</h3>
-                    <input value={userInput} onChange={(e) => { changeUserInput(e.target.value) }} onKeyDownCapture={(e) => { 
-                        if (e.key == 'Enter') {
-                            ws?.send(JSON.stringify({ "content":userInput, "reply": repliedMessage?.id }));
-                            changeUserInput('');
-                            changeRepliedMessage(undefined);
-                        }
-                    }}>
-                    </input>
+                            <hr/>
+                        </>
+                    }
+                    <div>
+                        <h3>{'>'}</h3>
+                        <input value={userInput} onChange={(e) => { changeUserInput(e.target.value) }} onKeyDownCapture={(e) => { 
+                            if (e.key == 'Enter') {
+                                ws?.send(JSON.stringify({ "content":userInput, "reply": repliedMessage?.id }));
+                                changeUserInput('');
+                                changeRepliedMessage(undefined);
+                            }
+                        }}>
+                        </input>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div id={styles.memberList} className={styles.container}>
-            <ChannelInfo/>
+            <div id={styles.memberList} className={styles.container}>
+                <ChannelInfo/>
+            </div>
         </div>
     </div>
 }
