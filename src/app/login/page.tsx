@@ -10,8 +10,8 @@ import { redirect } from 'next/navigation';
 export default function loginPage() {
     const [userState, changeUserState] = useState(true);
 
-    const [username, changeUsername] = useState('lorem');
-    const [password, changePassword] = useState('ipsum');
+    const [username, changeUsername] = useState('');
+    const [password, changePassword] = useState('');
     const [confirmPassword, changeConfirmPassword] = useState('');
 
     const [showPassword, toggleShowPassword] = useState(false);
