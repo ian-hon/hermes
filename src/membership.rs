@@ -29,7 +29,7 @@ impl Membership {
         }
     }
 
-    pub async fn use_invite(db: &Pool<Sqlite>, invite: i32, user: String) -> MembershipError {
+    pub async fn use_invite(db: &Pool<Sqlite>, invite: i64, user: String) -> MembershipError {
         match Membership::get_invite(db, invite).await {
             Some(c) => {
                 match Membership::fetch_membership(db, user.clone(), c.id).await {
@@ -44,7 +44,7 @@ impl Membership {
         }
     }
 
-    pub async fn get_invite(db: &Pool<Sqlite>, invite: i32) -> Option<Channel> {
+    pub async fn get_invite(db: &Pool<Sqlite>, invite: i64) -> Option<Channel> {
         sqlx::query_as::<_, Channel>("select * from channel where invite = $1;")
             .bind(invite)
             .fetch_optional(db)
@@ -89,6 +89,6 @@ pub async fn add_membership(
     utils::request_boiler(app_state, query, session_id, vec![
         ("invite", HermesFormat::BigNumber)
     ], |db, s, query | async move {
-        serde_json::to_string(&Membership::use_invite(&db, utils::from_query("invite", &query).parse::<i32>().unwrap(), s.user).await).unwrap().to_string()
+        serde_json::to_string(&Membership::use_invite(&db, utils::from_query("invite", &query).parse::<i64>().unwrap(), s.user).await).unwrap().to_string()
     }).await
 }
